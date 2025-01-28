@@ -2,11 +2,11 @@ import { getWalletClient } from "./utils";
 
 import { getHash, printBalance, printBasicInfo, transferBalance } from "./eth";
 
-import { getApi } from "./substrate"
+import { getBalance } from "./substrate"
 
 async function main() {
     await printBalance();
-    const api = getApi('wss://test.finney.opentensor.ai:443')
+    await getBalance();
 
     console.log("hello world");
 }
