@@ -1,9 +1,13 @@
 import { getWalletClient } from "./utils";
 
-import { printAddress } from "./eth";
+import { getHash, printBalance, printBasicInfo, transferBalance } from "./eth";
+
+import { getApi } from "./substrate"
 
 async function main() {
-    await printAddress();
+    await printBalance();
+    const api = getApi('wss://test.finney.opentensor.ai:443')
+
     console.log("hello world");
 }
 

@@ -6,10 +6,12 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@polkadot-labs/hdkd": "0.0.10",
+    "@polkadot-api/descriptors": "file:.papi/descriptors",
     "@polkadot/api": "15.1.1",
     "dotenv": "16.4.7",
     "ethers": "^6.13.4",
-    "@polkadot-labs/hdkd": "0.0.10",
+    "polkadot-api": "^1.8.4",
     "viem": "^2.21.47"
   },
   "devDependencies": {

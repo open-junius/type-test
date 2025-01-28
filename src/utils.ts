@@ -5,10 +5,10 @@ import { hexToU8a } from "@polkadot/util";
 import { encodeAddress } from "@polkadot/util-crypto";
 import { ethers } from "ethers";
 
-export type ClientUrlType = 'http://localhost:9944' | 'https://dev.chain.opentensor.ai';
+export type ClientUrlType = 'http://localhost:9944' | 'https://dev.chain.opentensor.ai' | 'https://test.chain.opentensor.ai';
 
-export const chain = defineChain({
-    id: 947,
+export const chain = (id: number, url: string) => defineChain({
+    id: id,
     name: 'bittenso',
     network: 'bittensor',
     nativeCurrency: {
@@ -18,7 +18,7 @@ export const chain = defineChain({
     },
     rpcUrls: {
         default: {
-            http: ['http://localhost:9944'],
+            http: [url],
         },
     },
     testnet: true,
@@ -39,7 +39,7 @@ export async function getWalletClient(url: ClientUrlType) {
     const wallet = createWalletClient({
         account,
         transport: http(),
-        chain,
+        chain: chain(42, url),
     })
 
     return wallet.extend(publicActions)

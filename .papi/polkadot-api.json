@@ -1,0 +1,22 @@
+{
+  "version": 0,
+  "descriptorPath": ".papi/descriptors",
+  "entries": {
+    "devnet": {
+      "wsUrl": "wss://dev.chain.opentensor.ai:443",
+      "metadata": ".papi/metadata/devnet.scale"
+    },
+    "testnet": {
+      "wsUrl": "wss://test.finney.opentensor.ai:443",
+      "metadata": ".papi/metadata/testnet.scale"
+    },
+    "mainnet": {
+      "wsUrl": "wss://archive.chain.opentensor.ai",
+      "metadata": ".papi/metadata/mainnet.scale"
+    },
+    "localnet": {
+      "wsUrl": "ws://localhost:9944",
+      "metadata": ".papi/metadata/localnet.scale"
+    }
+  }
+}
