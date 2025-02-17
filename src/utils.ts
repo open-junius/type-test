@@ -89,7 +89,7 @@ export function ss58ToH160(ss58Address: string) {
  * Generates a random Ethereum wallet
  * @returns wallet keyring
  */
-export function generateRandomAddress() {
+export function generateRandomWallet() {
     const wallet = ethers.Wallet.createRandom();
     return wallet;
 }
