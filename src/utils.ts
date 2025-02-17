@@ -5,7 +5,7 @@ import { hexToU8a } from "@polkadot/util";
 import { encodeAddress } from "@polkadot/util-crypto";
 import { ethers } from "ethers";
 
-export type ClientUrlType = 'http://localhost:9944' | 'https://dev.chain.opentensor.ai' | 'https://test.chain.opentensor.ai';
+export type ClientUrlType = 'http://localhost:9944';
 
 export const chain = (id: number, url: string) => defineChain({
     id: id,
@@ -24,13 +24,14 @@ export const chain = (id: number, url: string) => defineChain({
     testnet: true,
 })
 
-export async function getWalletClient(url: ClientUrlType) {
-    require('dotenv').config();
-    const privateKey = process.env.PRIVATE_KEY;
+export async function getWalletClient(url: ClientUrlType, privateKey: string) {
+    // require('dotenv').config();
+    // const privateKey = process.env.PRIVATE_KEY;
 
-    if (!privateKey) {
-        throw new Error("PRIVATE_KEY is not defined in the environment variables.");
-    }
+    // if (!privateKey) {
+    //     throw new Error("PRIVATE_KEY is not defined in the environment variables.");
+    // }
+    privateKey = privateKey.replace('0x', '');
 
     const account = privateKeyToAccount(`0x${privateKey}`)
     console.log(`Wallet address ${account.address}`)

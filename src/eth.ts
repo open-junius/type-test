@@ -1,9 +1,10 @@
 import { publicKeyToAddress } from "viem/accounts";
-import { convertH160ToSS58, getWalletClient } from "./utils";
+import { convertH160ToSS58, getWalletClient, generateRandomAddress } from "./utils";
 import { ethers } from "ethers";
 
 export async function printBasicInfo() {
-    const wallet = await getWalletClient('http://localhost:9944')
+    const privateKey = generateRandomAddress().privateKey
+    const wallet = await getWalletClient('http://localhost:9944', privateKey)
 
     console.log("chain id is: ", await wallet.getChainId());
     // const address = await wallet.account.address;
@@ -16,7 +17,7 @@ export async function printBasicInfo() {
 }
 
 export async function printBalance() {
-    const wallet = await getWalletClient('https://test.chain.opentensor.ai')
+    const wallet = await getWalletClient('http://localhost:9944')
     // const wallet = await getWalletClient('http://localhost:9944')
 
     // 0xBBCa0709c54CD137145AAb34c02754f582B94b08
@@ -33,7 +34,7 @@ export async function printBalance() {
 export async function getHash() {
     const txHash = "0xd4261e3218589419e011bbfee2e7c5577f7bf17bb7be4675d219d9accaa62844"
 
-    const wallet = await getWalletClient('https://dev.chain.opentensor.ai')
+    const wallet = await getWalletClient('http://localhost:9944')
     // const tx = await wallet.getTransaction({ hash: txHash });
 
     const ss58 = convertH160ToSS58("0xBBCa0709c54CD137145AAb34c02754f582B94b08");
@@ -42,7 +43,6 @@ export async function getHash() {
 
 }
 export async function transferBalance() {
-    // const wallet = await getWalletClient('https://dev.chain.opentensor.ai')
     const wallet = await getWalletClient('http://localhost:9944')
 
     console.log(await wallet.getChainId());
@@ -57,16 +57,7 @@ export async function transferBalance() {
     }
 
     const response = await wallet.sendTransaction({ ...tx, to: `0x${tx.to}` });
-    console.log(response);
 
-
-    console.log(wallet.account.address);
-
-    // let i = 0;
-    // while (i < 20) {
     await new Promise(resolve => setTimeout(resolve, 1000));
     console.log(await wallet.getBalance({ address: `0x${toAddress}` }));
-    //     i += 1;
-    // }
-    console.log("hello world");
 }
