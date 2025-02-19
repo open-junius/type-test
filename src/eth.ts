@@ -1,6 +1,6 @@
 import { publicKeyToAddress } from "viem/accounts";
-import { convertH160ToSS58, getWalletClient, generateRandomAddress } from "./utils";
-import { ethers } from "ethers";
+import { convertH160ToSS58, getWalletClient } from "./utils";
+// import { ethers } from "ethers";
 
 export async function printBasicInfo() {
     const privateKey = generateRandomAddress().privateKey

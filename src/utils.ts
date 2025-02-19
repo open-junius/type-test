@@ -1,10 +1,10 @@
-import { createWalletClient, defineChain, http, publicActions, zeroAddress } from "viem"
-import { privateKeyToAccount } from 'viem/accounts'
+import { Account, createWalletClient, defineChain, http, publicActions, zeroAddress } from "viem"
+import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts'
 import { blake2AsU8a, decodeAddress } from "@polkadot/util-crypto";
 import { hexToU8a } from "@polkadot/util";
 import { encodeAddress } from "@polkadot/util-crypto";
-import { ethers } from "ethers";
-
+import { MultiAddress } from '@polkadot-api/descriptors';
+import { ss58Address } from "@polkadot-labs/hdkd-helpers";
 export type ClientUrlType = 'http://localhost:9944';
 
 export const chain = (id: number, url: string) => defineChain({
@@ -24,17 +24,17 @@ export const chain = (id: number, url: string) => defineChain({
     testnet: true,
 })
 
-export async function getWalletClient(url: ClientUrlType, privateKey: string) {
+export async function getWalletClient(url: ClientUrlType, account: Account) {
     // require('dotenv').config();
     // const privateKey = process.env.PRIVATE_KEY;
 
     // if (!privateKey) {
     //     throw new Error("PRIVATE_KEY is not defined in the environment variables.");
     // }
-    privateKey = privateKey.replace('0x', '');
+    // privateKey = privateKey.replace('0x', '');
 
-    const account = privateKeyToAccount(`0x${privateKey}`)
-    console.log(`Wallet address ${account.address}`)
+    // const account = privateKeyToAccount(`0x${privateKey}`)
+    // console.log(`Wallet address ${account.address}`)
 
 
     const wallet = createWalletClient({
@@ -44,6 +44,11 @@ export async function getWalletClient(url: ClientUrlType, privateKey: string) {
     })
 
     return wallet.extend(publicActions)
+}
+
+export function convertSs58ToMultiAddress(ss58Address: string) {
+    const address = MultiAddress.Id(ss58Address)
+    return address
 }
 
 export function convertH160ToSS58(ethAddress: string) {
@@ -90,6 +95,10 @@ export function ss58ToH160(ss58Address: string) {
  * @returns wallet keyring
  */
 export function generateRandomWallet() {
-    const wallet = ethers.Wallet.createRandom();
-    return wallet;
+    let privateKey = generatePrivateKey().toString();
+    privateKey = privateKey.replace('0x', '');
+
+    const account = privateKeyToAccount(`0x${privateKey}`)
+
+    return account
 }

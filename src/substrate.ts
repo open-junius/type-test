@@ -1,5 +1,5 @@
 import { devnet } from '@polkadot-api/descriptors';
-import { createClient, TypedApi } from 'polkadot-api';
+import { createClient, PolkadotClient, TypedApi, Transaction, PolkadotSigner, Binary } from 'polkadot-api';
 import { getWsProvider } from 'polkadot-api/ws-provider/web';
 import { sr25519CreateDerive } from "@polkadot-labs/hdkd"
 import {
@@ -9,39 +9,113 @@ import {
     mnemonicToEntropy,
 } from "@polkadot-labs/hdkd-helpers"
 
+import { getPolkadotSigner } from "polkadot-api/signer"
+import { randomBytes } from 'crypto';
 
+// define url string as type to extend in the future
 // export type ClientUrlType = 'ws://localhost:9944' | 'wss://test.finney.opentensor.ai:443' | 'wss://dev.chain.opentensor.ai:443' | 'wss://archive.chain.opentensor.ai';
 export type ClientUrlType = 'ws://localhost:9944'
 
-export async function getApi(url: ClientUrlType) {
+
+export async function getClient(url: ClientUrlType) {
     const provider = getWsProvider(url);
     const client = createClient(provider);
-    let dotApi;
-    switch (url) {
-        case 'ws://localhost:9944': dotApi = client.getTypedApi(devnet)
-    }
-
-    return dotApi
+    return client
 }
 
-export async function getBalance() {
-    const api = await getApi('ws://localhost:9944')
-    const account = "5GrwvaEF5zXb26Fz9rcQpDWS57CtERHpNehXCPcNoHGKutQY";
-    const balance = (await api.query.Balances.Account.getValue(account)).free;
-    console.log("balance is: ", balance.toString());
+export async function getDevnetApi(client: PolkadotClient) {
+    let api = client.getTypedApi(devnet)
+    return api
 }
 
-export function getKeyPair() {
-    require('dotenv').config();
-    const phrase = process.env.URI;
-    if (!phrase) {
-        throw new Error("PRIVATE_KEY is not defined in the environment variables.");
-    }
-    const entropy = mnemonicToEntropy(phrase)
+export function getAlice() {
+    const entropy = mnemonicToEntropy(DEV_PHRASE)
     const miniSecret = entropyToMiniSecret(entropy)
     const derive = sr25519CreateDerive(miniSecret)
+    const hdkdKeyPair = derive("//Alice")
 
-    // Example usage for generating a sr25519 keypair with hard derivation
-    const keypair = derive("//Alice")
-    return keypair
+    return hdkdKeyPair
+}
+
+export function getAliceSigner() {
+    const alice = getAlice()
+    const polkadotSigner = getPolkadotSigner(
+        alice.publicKey,
+        "Sr25519",
+        alice.sign,
+    )
+
+    return polkadotSigner
+}
+
+export function getRandomKeypair() {
+    const seed = randomBytes(32);
+    const miniSecret = entropyToMiniSecret(seed)
+    const derive = sr25519CreateDerive(miniSecret)
+    const hdkdKeyPair = derive("")
+
+    return hdkdKeyPair
+}
+
+export async function getBalance(api: TypedApi<typeof devnet>) {
+    const value = await api.query.Balances.Account.getValue("")
+    return value
+}
+
+export async function waitForTransactionCompletion(tx: Transaction<{}, string, string, void>, signer: PolkadotSigner,) {
+    return new Promise<void>((resolve, reject) => {
+        const subscription = tx.signSubmitAndWatch(signer).subscribe({
+            next(value) {
+                console.log("Event:", value);
+
+                if (value.type === "txBestBlocksState") {
+                    console.log("Transaction is finalized in block:", value.txHash);
+                    subscription.unsubscribe();
+                    // Resolve the promise when the transaction is finalized
+                    resolve();
+
+                }
+            },
+            error(err) {
+                console.error("Transaction failed:", err);
+                subscription.unsubscribe();
+                // Reject the promise in case of an error
+                reject(err);
+
+            },
+            complete() {
+                console.log("Subscription complete");
+            }
+        });
+    });
+}
+
+// second solution to wait for transaction finalization. pass the raw data to avoid the complex transaction type definition
+export async function waitForTransactionCompletion2(api: TypedApi<typeof devnet>, raw: Binary, signer: PolkadotSigner,) {
+    const tx = await api.txFromCallData(raw);
+    return new Promise<void>((resolve, reject) => {
+        const subscription = tx.signSubmitAndWatch(signer).subscribe({
+            next(value) {
+                console.log("Event:", value);
+
+                if (value.type === "txBestBlocksState") {
+                    console.log("Transaction is finalized in block:", value.txHash);
+                    subscription.unsubscribe();
+                    // Resolve the promise when the transaction is finalized
+                    resolve();
+
+                }
+            },
+            error(err) {
+                console.error("Transaction failed:", err);
+                subscription.unsubscribe();
+                // Reject the promise in case of an error
+                reject(err);
+
+            },
+            complete() {
+                console.log("Subscription complete");
+            }
+        });
+    });
 }
