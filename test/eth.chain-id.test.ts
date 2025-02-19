@@ -2,12 +2,21 @@
 import * as assert from "assert";
 import * as chai from "chai";
 
-import { getAliceSigner, getClient, getDevnetApi, waitForTransactionCompletion } from "../src/substrate"
+import { getAliceSigner, getClient, getDevnetApi, waitForTransactionCompletion, convertPublicKeyToMultiAddress } from "../src/substrate"
 import { generateRandomWallet, getWalletClient, convertH160ToSS58 } from "../src/utils";
 
 
 describe("Test the EVM chain ID", () => {
   before(async () => {
+    let subClient = await getClient('ws://localhost:9944')
+    let api = await getDevnetApi(subClient)
+    let alice = await getAliceSigner();
+    let multiAddress = convertPublicKeyToMultiAddress(alice.publicKey)
+    const internalCall = api.tx.Balances.force_set_balance({ who: multiAddress, new_free: BigInt(1e18) })
+    const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
+    await waitForTransactionCompletion(tx, alice)
+      .then(() => { })
+      .catch((error) => { console.log(`transaction error ${error}`) });
 
   });
 
@@ -27,12 +36,8 @@ describe("Test the EVM chain ID", () => {
 
 
     await waitForTransactionCompletion(tx, alice)
-      .then(() => {
-        console.log("Transaction completed successfully.");
-      })
-      .catch((error) => {
-        console.error("Transaction encountered an error:", error);
-      });
+      .then(() => { })
+      .catch((error) => { console.log(`transaction error ${error}`) });
 
     chainId = await ethClient.getChainId();
     assert.equal(chainId, 100);

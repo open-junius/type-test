@@ -6,8 +6,6 @@ import { getBalance } from "./substrate"
 
 async function main() {
     await printBalance();
-    await getBalance();
-
     console.log("hello world");
 }
 

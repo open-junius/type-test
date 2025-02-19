@@ -1,4 +1,4 @@
-import { devnet } from '@polkadot-api/descriptors';
+import { devnet, MultiAddress } from '@polkadot-api/descriptors';
 import { createClient, PolkadotClient, TypedApi, Transaction, PolkadotSigner, Binary } from 'polkadot-api';
 import { getWsProvider } from 'polkadot-api/ws-provider/web';
 import { sr25519CreateDerive } from "@polkadot-labs/hdkd"
@@ -11,6 +11,7 @@ import {
 
 import { getPolkadotSigner } from "polkadot-api/signer"
 import { randomBytes } from 'crypto';
+import { Keyring } from '@polkadot/keyring';
 
 // define url string as type to extend in the future
 // export type ClientUrlType = 'ws://localhost:9944' | 'wss://test.finney.opentensor.ai:443' | 'wss://dev.chain.opentensor.ai:443' | 'wss://archive.chain.opentensor.ai';
@@ -60,6 +61,16 @@ export function getRandomKeypair() {
 export async function getBalance(api: TypedApi<typeof devnet>) {
     const value = await api.query.Balances.Account.getValue("")
     return value
+}
+
+export function convertPublicKeyToMultiAddress(publicKey: Uint8Array, ss58Format: number = 42): MultiAddress {
+    // Create a keyring instance
+    const keyring = new Keyring({ type: 'sr25519', ss58Format });
+
+    // Add the public key to the keyring
+    const address = keyring.encodeAddress(publicKey);
+
+    return MultiAddress.Id(address);
 }
 
 export async function waitForTransactionCompletion(tx: Transaction<{}, string, string, void>, signer: PolkadotSigner,) {
