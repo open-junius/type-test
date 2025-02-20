@@ -50,7 +50,7 @@ export function getAliceSigner() {
     return polkadotSigner
 }
 
-export function getRandomKeypair() {
+export function getRandomSubstrateKeypair() {
     const seed = randomBytes(32);
     const miniSecret = entropyToMiniSecret(seed)
     const derive = sr25519CreateDerive(miniSecret)
@@ -98,7 +98,6 @@ export async function getNonceChangePromise(api: TypedApi<typeof devnet>, ss58Ad
             resolve()
         }, 2000);
 
-        // return value.nonce
     })
 }
 

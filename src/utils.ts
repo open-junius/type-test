@@ -94,7 +94,7 @@ export function ss58ToH160(ss58Address: string) {
  * Generates a random Ethereum wallet
  * @returns wallet keyring
  */
-export function generateRandomWallet() {
+export function generateRandomEthWallet() {
     let privateKey = generatePrivateKey().toString();
     privateKey = privateKey.replace('0x', '');
 

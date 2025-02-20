@@ -1,10 +1,10 @@
 import { publicKeyToAddress } from "viem/accounts";
-import { convertH160ToSS58, getWalletClient, generateRandomWallet } from "./utils";
+import { convertH160ToSS58, getWalletClient, generateRandomEthWallet } from "./utils";
 import { verifyMessage } from "viem/_types/actions/public/verifyMessage";
 // import { ethers } from "ethers";
 
 export async function printBasicInfo() {
-    const ethClient = await getWalletClient('http://localhost:9944', generateRandomWallet())
+    const ethClient = await getWalletClient('http://localhost:9944', generateRandomEthWallet())
 
     console.log("chain id is: ", await ethClient.getChainId());
     // const address = await wallet.account.address;
@@ -17,7 +17,7 @@ export async function printBasicInfo() {
 }
 
 export async function printBalance() {
-    const wallet = await getWalletClient('http://localhost:9944', generateRandomWallet())
+    const wallet = await getWalletClient('http://localhost:9944', generateRandomEthWallet())
     const toAddress = "BBCa0709c54CD137145AAb34c02754f582B94b08";
 
 
@@ -30,7 +30,7 @@ export async function printBalance() {
 export async function getHash() {
     const txHash = "0xd4261e3218589419e011bbfee2e7c5577f7bf17bb7be4675d219d9accaa62844"
 
-    const wallet = await getWalletClient('http://localhost:9944', generateRandomWallet())
+    const wallet = await getWalletClient('http://localhost:9944', generateRandomEthWallet())
 
     const ss58 = convertH160ToSS58("0xBBCa0709c54CD137145AAb34c02754f582B94b08");
 
@@ -38,7 +38,7 @@ export async function getHash() {
 
 }
 export async function transferBalance() {
-    const wallet = await getWalletClient('http://localhost:9944', generateRandomWallet())
+    const wallet = await getWalletClient('http://localhost:9944', generateRandomEthWallet())
 
     console.log(await wallet.getChainId());
 
