@@ -2,8 +2,8 @@
 import * as assert from "assert";
 import * as chai from "chai";
 
-import { getAliceSigner, getClient, getDevnetApi, waitForTransactionCompletion, convertPublicKeyToMultiAddress, getRandomSubstrateKeypair, getNonce, convertPublicKeyToSs58, waitForFinalizedBlock } from "../src/substrate"
-import { generateRandomEthWallet, getWalletClient, convertH160ToSS58 } from "../src/utils";
+import { getAliceSigner, getClient, getDevnetApi, waitForTransactionCompletion, convertPublicKeyToMultiAddress, getRandomSubstrateKeypair } from "../src/substrate"
+import { generateRandomEthWallet, getWalletClient } from "../src/utils";
 import { ETH_LOCAL_URL, SUB_LOCAL_URL } from "../src/config";
 
 import { getPolkadotSigner } from "polkadot-api/signer";
@@ -18,6 +18,7 @@ describe("Test the EVM chain ID", async () => {
   const subClient = await getClient(SUB_LOCAL_URL)
   const api = await getDevnetApi(subClient)
 
+  // sudo account alice as signer
   const alice = await getAliceSigner();
 
   // init other variable

@@ -2,6 +2,10 @@
 
 test with ts
 
+## install papi
+
+npm install polkadot-api
+
 ## polkadot api
 
 npx papi add localnet -w ws://10.0.0.11:9944
