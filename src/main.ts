@@ -2,11 +2,13 @@ import { getWalletClient } from "./utils";
 
 import { getHash, printBalance, printBasicInfo, transferBalance } from "./eth";
 
-import { getBalance } from "./substrate"
+import { getBalance, getClient, getDevnetApi } from "./substrate"
 
 async function main() {
-    await printBalance();
-    console.log("hello world");
+    let subClient = await getClient('ws://localhost:9944')
+    let api = await getDevnetApi(subClient)
+
+    api.query.System.Events.watchValue("finalized")
 }
 
 main();

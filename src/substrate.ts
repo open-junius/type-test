@@ -7,6 +7,7 @@ import {
     DEV_PHRASE,
     entropyToMiniSecret,
     mnemonicToEntropy,
+    ss58Address,
 } from "@polkadot-labs/hdkd-helpers"
 
 import { getPolkadotSigner } from "polkadot-api/signer"
@@ -63,6 +64,54 @@ export async function getBalance(api: TypedApi<typeof devnet>) {
     return value
 }
 
+export async function getNonce(api: TypedApi<typeof devnet>, ss58Address: string): Promise<number> {
+    const value = await api.query.System.Account.getValue(ss58Address);
+    return value.nonce
+}
+
+export async function getNonceChangePromise(api: TypedApi<typeof devnet>, ss58Address: string) {
+    const initValue = await api.query.System.Account.getValue(ss58Address);
+    return new Promise<void>((resolve, reject) => {
+        const subscription = api.query.System.Account.watchValue(ss58Address).subscribe({
+            next(value) {
+                if (value > initValue) {
+                    subscription.unsubscribe();
+                    // Resolve the promise when the transaction is finalized
+                    resolve();
+                }
+            },
+
+            error(err) {
+                console.error("Transaction failed:", err);
+                subscription.unsubscribe();
+                // Reject the promise in case of an error
+                reject(err);
+            },
+            complete() {
+                console.log("Subscription complete");
+            }
+        })
+
+        setTimeout(() => {
+            subscription.unsubscribe();
+            console.log('unsubscribed!');
+            resolve()
+        }, 2000);
+
+        // return value.nonce
+    })
+}
+
+export function convertPublicKeyToSs58(publicKey: Uint8Array, ss58Format: number = 42): string {
+    // Create a keyring instance
+    const keyring = new Keyring({ type: 'sr25519', ss58Format });
+
+    // Add the public key to the keyring
+    const address = keyring.encodeAddress(publicKey);
+
+    return address
+}
+
 export function convertPublicKeyToMultiAddress(publicKey: Uint8Array, ss58Format: number = 42): MultiAddress {
     // Create a keyring instance
     const keyring = new Keyring({ type: 'sr25519', ss58Format });
@@ -73,13 +122,26 @@ export function convertPublicKeyToMultiAddress(publicKey: Uint8Array, ss58Format
     return MultiAddress.Id(address);
 }
 
-export async function waitForTransactionCompletion(tx: Transaction<{}, string, string, void>, signer: PolkadotSigner,) {
+export async function waitForTransactionCompletion(api: TypedApi<typeof devnet>, tx: Transaction<{}, string, string, void>, signer: PolkadotSigner,) {
+    const transactionPromise = await getTransactionWatchPromise(tx, signer)
+    const ss58Address = convertPublicKeyToSs58(signer.publicKey)
+    const noncePromise = await getNonceChangePromise(api, ss58Address)
+
+    return new Promise<void>((resolve, reject) => {
+        Promise.race([transactionPromise, noncePromise])
+            .then(resolve)
+            .catch(reject);
+    })
+}
+
+export async function getTransactionWatchPromise(tx: Transaction<{}, string, string, void>, signer: PolkadotSigner,) {
     return new Promise<void>((resolve, reject) => {
         const subscription = tx.signSubmitAndWatch(signer).subscribe({
             next(value) {
                 console.log("Event:", value);
 
-                if (value.type === "txBestBlocksState") {
+                // TODO investigate why finalized not for each extrinsic
+                if (value.type === "finalized") {
                     console.log("Transaction is finalized in block:", value.txHash);
                     subscription.unsubscribe();
                     // Resolve the promise when the transaction is finalized
@@ -98,6 +160,50 @@ export async function waitForTransactionCompletion(tx: Transaction<{}, string, s
                 console.log("Subscription complete");
             }
         });
+
+        setTimeout(() => {
+            subscription.unsubscribe();
+            console.log('unsubscribed!');
+            resolve()
+        }, 2000);
+    });
+}
+
+export async function waitForFinalizedBlock(api: TypedApi<typeof devnet>) {
+    const currentBlockNumber = await api.query.System.Number.getValue()
+    return new Promise<void>((resolve, reject) => {
+
+        const subscription = api.query.System.Number.watchValue().subscribe({
+            // TODO check why the block number event just get once
+            next(value) {
+                console.log("Event block number is :", value);
+
+                if (value > currentBlockNumber + 6) {
+                    console.log("Transaction is finalized in block:", value);
+                    subscription.unsubscribe();
+
+                    resolve();
+
+                }
+
+            },
+            error(err) {
+                console.error("Transaction failed:", err);
+                subscription.unsubscribe();
+                // Reject the promise in case of an error
+                reject(err);
+
+            },
+            complete() {
+                console.log("Subscription complete");
+            }
+        });
+
+        setTimeout(() => {
+            subscription.unsubscribe();
+            console.log('unsubscribed!');
+            resolve()
+        }, 2000);
     });
 }
 
@@ -129,4 +235,16 @@ export async function waitForTransactionCompletion2(api: TypedApi<typeof devnet>
             }
         });
     });
+}
+
+export async function waitForNonceChange(api: TypedApi<typeof devnet>, ss58Address: string) {
+    const initNonce = await getNonce(api, ss58Address)
+    while (true) {
+        const currentNonce = await getNonce(api, ss58Address)
+        if (currentNonce > initNonce) {
+            break
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 200));
+    }
 }
