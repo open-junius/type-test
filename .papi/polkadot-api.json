@@ -4,19 +4,8 @@
   "entries": {
     "devnet": {
       "wsUrl": "ws://localhost:9944",
-      "metadata": ".papi/metadata/devnet.scale"
-    },
-    "testnet": {
-      "wsUrl": "wss://test.finney.opentensor.ai:443",
-      "metadata": ".papi/metadata/testnet.scale"
-    },
-    "mainnet": {
-      "wsUrl": "wss://archive.chain.opentensor.ai",
-      "metadata": ".papi/metadata/mainnet.scale"
-    },
-    "localnet": {
-      "wsUrl": "ws://localhost:9944",
-      "metadata": ".papi/metadata/localnet.scale"
+      "metadata": ".papi/metadata/devnet.scale",
+      "genesis": "0xd4ee169957410f461aada33a817b3800a1521267a1d34d4b8b14836ba4ebcb93"
     }
   }
 }

@@ -5,27 +5,33 @@ import * as chai from "chai";
 import { getAliceSigner, getClient, getDevnetApi, waitForTransactionCompletion, convertPublicKeyToMultiAddress, getRandomSubstrateKeypair } from "../src/substrate"
 import { generateRandomEthWallet, getWalletClient } from "../src/utils";
 import { ETH_LOCAL_URL, SUB_LOCAL_URL } from "../src/config";
-
+import { devnet } from "@polkadot-api/descriptors"
 import { getPolkadotSigner } from "polkadot-api/signer";
+import { WalletClient } from "viem";
+import { PolkadotSigner, TypedApi } from "polkadot-api";
 
-describe("Test the EVM chain ID", async () => {
+describe("Test the EVM chain ID", () => {
   // init eth part
   const wallet = generateRandomEthWallet();
-  const ethClient = await getWalletClient(ETH_LOCAL_URL, wallet);
+  let ethClient: WalletClient;
 
   // init substrate part
   const keyPair = getRandomSubstrateKeypair();
-  const subClient = await getClient(SUB_LOCAL_URL)
-  const api = await getDevnetApi(subClient)
+  let api: TypedApi<typeof devnet>
 
   // sudo account alice as signer
-  const alice = await getAliceSigner();
+  let alice: PolkadotSigner;
 
   // init other variable
   const initChainId = 42;
 
   before(async () => {
-    // let account = getRandomSubstrateKeypair()
+    // init variables got from await and async
+    ethClient = await getWalletClient(ETH_LOCAL_URL, wallet);
+    const subClient = await getClient(SUB_LOCAL_URL)
+    api = await getDevnetApi(subClient)
+    alice = await getAliceSigner();
+
     let multiAddress = convertPublicKeyToMultiAddress(keyPair.publicKey)
     const internalCall = api.tx.Balances.force_set_balance({ who: multiAddress, new_free: BigInt(1e12) })
     const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })

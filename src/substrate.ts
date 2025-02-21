@@ -70,18 +70,19 @@ export async function getNonce(api: TypedApi<typeof devnet>, ss58Address: string
 }
 
 export async function getNonceChangePromise(api: TypedApi<typeof devnet>, ss58Address: string) {
+    // api.query.System.Account.getValue()
     const initValue = await api.query.System.Account.getValue(ss58Address);
     return new Promise<void>((resolve, reject) => {
         const subscription = api.query.System.Account.watchValue(ss58Address).subscribe({
             next(value) {
-                if (value > initValue) {
+                if (value.nonce > initValue.nonce) {
                     subscription.unsubscribe();
                     // Resolve the promise when the transaction is finalized
                     resolve();
                 }
             },
 
-            error(err) {
+            error(err: Error) {
                 console.error("Transaction failed:", err);
                 subscription.unsubscribe();
                 // Reject the promise in case of an error
@@ -174,7 +175,7 @@ export async function waitForFinalizedBlock(api: TypedApi<typeof devnet>) {
 
         const subscription = api.query.System.Number.watchValue().subscribe({
             // TODO check why the block number event just get once
-            next(value) {
+            next(value: number) {
                 console.log("Event block number is :", value);
 
                 if (value > currentBlockNumber + 6) {
@@ -186,7 +187,7 @@ export async function waitForFinalizedBlock(api: TypedApi<typeof devnet>) {
                 }
 
             },
-            error(err) {
+            error(err: Error) {
                 console.error("Transaction failed:", err);
                 subscription.unsubscribe();
                 // Reject the promise in case of an error
@@ -222,7 +223,7 @@ export async function waitForTransactionCompletion2(api: TypedApi<typeof devnet>
 
                 }
             },
-            error(err) {
+            error(err: Error) {
                 console.error("Transaction failed:", err);
                 subscription.unsubscribe();
                 // Reject the promise in case of an error

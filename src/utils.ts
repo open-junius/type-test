@@ -1,4 +1,4 @@
-import { Account, createWalletClient, defineChain, http, publicActions, zeroAddress } from "viem"
+import { Account, createWalletClient, defineChain, http, publicActions, createPublicClient } from "viem"
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts'
 import { blake2AsU8a, decodeAddress } from "@polkadot/util-crypto";
 import { hexToU8a } from "@polkadot/util";
@@ -41,6 +41,28 @@ export async function getWalletClient(url: ClientUrlType, account: Account) {
         account,
         transport: http(),
         chain: chain(42, url),
+    })
+
+    return wallet.extend(publicActions)
+}
+
+export async function getPublicClient(url: ClientUrlType) {
+    // require('dotenv').config();
+    // const privateKey = process.env.PRIVATE_KEY;
+
+    // if (!privateKey) {
+    //     throw new Error("PRIVATE_KEY is not defined in the environment variables.");
+    // }
+    // privateKey = privateKey.replace('0x', '');
+
+    // const account = privateKeyToAccount(`0x${privateKey}`)
+    // console.log(`Wallet address ${account.address}`)
+
+
+    const wallet = createPublicClient({
+        chain: chain(42, url),
+        transport: http(),
+
     })
 
     return wallet.extend(publicActions)
