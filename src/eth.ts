@@ -1,7 +1,18 @@
 import { publicKeyToAddress } from "viem/accounts";
 import { convertH160ToSS58, getWalletClient, generateRandomEthWallet } from "./utils";
 import { verifyMessage } from "viem/_types/actions/public/verifyMessage";
-// import { ethers } from "ethers";
+import { Provider, TransactionRequest } from "ethers";
+
+export async function estimateTransactionCost(provider: Provider, tx: TransactionRequest) {
+    const feeData = await provider.getFeeData();
+    const estimatedGas = BigInt(await provider.estimateGas(tx));
+    const gasPrice = feeData.gasPrice || feeData.maxFeePerGas;
+    if (gasPrice === null)
+        return estimatedGas
+    else
+        return estimatedGas * BigInt(gasPrice);
+}
+
 
 export async function printBasicInfo() {
     const ethClient = await getWalletClient('http://localhost:9944', generateRandomEthWallet())

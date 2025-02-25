@@ -8,6 +8,7 @@ import {
     entropyToMiniSecret,
     mnemonicToEntropy,
     ss58Address,
+    KeyPair,
 } from "@polkadot-labs/hdkd-helpers"
 
 import { getPolkadotSigner } from "polkadot-api/signer"
@@ -47,6 +48,20 @@ export function getAliceSigner() {
         alice.sign,
     )
 
+    return polkadotSigner
+}
+
+export function getRandomSubstrateSigner() {
+    const keypair = getRandomSubstrateKeypair();
+    return getSignerFromKeypair(keypair)
+}
+
+export function getSignerFromKeypair(keypair: KeyPair) {
+    const polkadotSigner = getPolkadotSigner(
+        keypair.publicKey,
+        "Sr25519",
+        keypair.sign,
+    )
     return polkadotSigner
 }
 

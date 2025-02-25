@@ -1,15 +1,20 @@
-import { Account, createWalletClient, defineChain, http, publicActions, createPublicClient } from "viem"
+import { Account, createWalletClient, defineChain, http, publicActions, createPublicClient, createClient, walletActions, createTestClient } from "viem"
 import { privateKeyToAccount, generatePrivateKey } from 'viem/accounts'
 import { blake2AsU8a, decodeAddress } from "@polkadot/util-crypto";
 import { hexToU8a } from "@polkadot/util";
 import { encodeAddress } from "@polkadot/util-crypto";
 import { MultiAddress } from '@polkadot-api/descriptors';
 import { ss58Address } from "@polkadot-labs/hdkd-helpers";
+
+import { mainnet, moonriver } from 'viem/chains'
+import { ethers } from "ethers"
+import { ETH_LOCAL_URL } from "./config"
+
 export type ClientUrlType = 'http://localhost:9944';
 
 export const chain = (id: number, url: string) => defineChain({
     id: id,
-    name: 'bittenso',
+    name: 'bittensor',
     network: 'bittensor',
     nativeCurrency: {
         name: 'tao',
@@ -23,6 +28,29 @@ export const chain = (id: number, url: string) => defineChain({
     },
     testnet: true,
 })
+
+export async function getTestClient(url: ClientUrlType, account: Account) {
+    // require('dotenv').config();
+    // const privateKey = process.env.PRIVATE_KEY;
+
+    // if (!privateKey) {
+    //     throw new Error("PRIVATE_KEY is not defined in the environment variables.");
+    // }
+    // privateKey = privateKey.replace('0x', '');
+
+    // const account = privateKeyToAccount(`0x${privateKey}`)
+    // console.log(`Wallet address ${account.address}`)
+
+
+    const wallet = createTestClient({
+        // account,
+        mode: 'anvil',
+        chain: chain(0, url),
+        transport: http(url),
+    })
+
+    return wallet.extend(publicActions).extend(walletActions)
+}
 
 export async function getWalletClient(url: ClientUrlType, account: Account) {
     // require('dotenv').config();
@@ -39,7 +67,7 @@ export async function getWalletClient(url: ClientUrlType, account: Account) {
 
     const wallet = createWalletClient({
         account,
-        transport: http(),
+        transport: http(url),
         chain: chain(42, url),
     })
 
@@ -121,6 +149,14 @@ export function generateRandomEthWallet() {
     privateKey = privateKey.replace('0x', '');
 
     const account = privateKeyToAccount(`0x${privateKey}`)
-
     return account
+}
+
+
+export function generateRandomEthersWallet() {
+    const account = ethers.Wallet.createRandom();
+    const provider = new ethers.JsonRpcProvider(ETH_LOCAL_URL);
+
+    const wallet = new ethers.Wallet(account.privateKey, provider);
+    return wallet;
 }
