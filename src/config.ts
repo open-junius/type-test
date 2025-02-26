@@ -18,3 +18,19 @@ export const IEd25519VerifyABI = [
     },
 ];
 
+export const IBALANCETRANSFER_ADDRESS = "0x0000000000000000000000000000000000000800";
+export const IBalanceTransferABI = [
+    {
+        inputs: [
+            {
+                internalType: "bytes32",
+                name: "data",
+                type: "bytes32",
+            },
+        ],
+        name: "transfer",
+        outputs: [],
+        stateMutability: "payable",
+        type: "function",
+    },
+];
