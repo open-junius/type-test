@@ -3,7 +3,7 @@ import * as chai from "chai";
 
 import { getAliceSigner, getClient, getDevnetApi, waitForTransactionCompletion, convertPublicKeyToMultiAddress, getRandomSubstrateSigner, } from "../src/substrate"
 import { generateRandomEthWallet, getPublicClient, getTestClient, getWalletClient, } from "../src/utils";
-import { ETH_LOCAL_URL, SUB_LOCAL_URL, IBALANCETRANSFER_ADDRESS, IBalanceTransferABI } from "../src/config";
+import { ETH_LOCAL_URL, SUB_LOCAL_URL, IBALANCETRANSFER_ADDRESS, IBalanceTransferABI, SIMPLE_PAYABLE_CONTRACT_ABI, SIMPLE_PAYABLE_CONTRACT_BYTECODE } from "../src/config";
 import { devnet, MultiAddress } from "@polkadot-api/descriptors"
 import { getPolkadotSigner } from "polkadot-api/signer";
 import { PublicClient, WalletClient, toBytes } from "viem";
@@ -11,9 +11,12 @@ import { PolkadotSigner, TypedApi, Binary, FixedSizeBinary } from "polkadot-api"
 import { wagmiContract } from "../src/bridgeToken";
 import { generateRandomEthersWallet } from "../src/utils";
 import { tao, raoToEth, compareEthBalanceWithTxFee } from "../src/balance-math";
-import { toViemAddress, convertSs58ToMultiAddress, convertPublicKeyToSs58, convertH160ToSS58, ss58ToH160, ss58ToEthAddress } from "../src/address-utils"
+import { toViemAddress, convertSs58ToMultiAddress, convertPublicKeyToSs58, convertH160ToSS58, ss58ToH160, ss58ToEthAddress, ethAddressToH160 } from "../src/address-utils"
 import { ethers } from "ethers"
 import { estimateTransactionCost, getContract } from "../src/eth"
+
+import { WITHDRAW_CONTRACT_ABI, WITHDRAW_CONTRACT_BYTECODE } from "../src/contracts/withdraw"
+
 describe("Balance transfers between substrate and EVM", () => {
     // init eth part
     const wallet = generateRandomEthersWallet();
@@ -104,8 +107,6 @@ describe("Balance transfers between substrate and EVM", () => {
 
     it("Can transfer token from EVM to Substrate", async () => {
         const contract = getContract(IBALANCETRANSFER_ADDRESS, IBalanceTransferABI, wallet)
-        // const ss58Address = convertH160ToSS58(wallet.address)
-
         const senderBalance = await publicClient.getBalance({ address: toViemAddress(wallet.address) })
         const receiverBalance = (await api.query.System.Account.getValue(convertPublicKeyToSs58(signer.publicKey))).data.free
         const transferBalance = raoToEth(tao(1))
@@ -135,9 +136,6 @@ describe("Balance transfers between substrate and EVM", () => {
         const txResponse = await wallet.sendTransaction(ethTransfer)
         await txResponse.wait();
 
-        const ethBalance = await publicClient.getBalance({ address: toViemAddress(ss58ToEthAddress(ss58Address)) })
-        console.log("ethBalance ", ethBalance)
-
         const tx = api.tx.EVM.withdraw({ address: ethAddresss, value: tao(1) })
         const txFee = (await tx.getPaymentInfo(ss58Address)).partial_fee
 
@@ -148,5 +146,92 @@ describe("Balance transfers between substrate and EVM", () => {
         const senderBalanceAfterWithdraw = (await api.query.System.Account.getValue(ss58Address)).data.free
 
         assert.equal(senderBalance, senderBalanceAfterWithdraw - tao(1) + txFee)
+    });
+
+    it("Transfer from EVM to substrate using evm::call", async () => {
+        const ss58Address = convertPublicKeyToSs58(signer.publicKey)
+        const ethAddresss = ss58ToH160(ss58Address);
+
+        // transfer token to mirror eth address
+        const ethTransfer = {
+            to: ss58ToEthAddress(ss58Address),
+            value: raoToEth(tao(2)).toString()
+        }
+
+        const txResponse = await wallet.sendTransaction(ethTransfer)
+        await txResponse.wait();
+
+        const source: FixedSizeBinary<20> = ethAddresss;
+        const target = ethAddressToH160(wallet.address)
+        const receiverBalance = await publicClient.getBalance({ address: toViemAddress(wallet.address) })
+
+        // all these parameter value are tricky, any change could make the call failed
+        const tx = api.tx.EVM.call({
+            source: source,
+            target: target,
+            // it is U256 in the extrinsic. 
+            value: [raoToEth(tao(1)), tao(0), tao(0), tao(0)],
+            gas_limit: BigInt(1000000),
+            // it is U256 in the extrinsic. 
+            max_fee_per_gas: [BigInt(10e9), BigInt(0), BigInt(0), BigInt(0)],
+            max_priority_fee_per_gas: undefined,
+            input: Binary.fromText(""),
+            nonce: undefined,
+            access_list: []
+        })
+        // txFee not accurate
+        const txFee = (await tx.getPaymentInfo(ss58Address)).partial_fee
+
+        await waitForTransactionCompletion(api, tx, signer)
+            .then(() => { })
+            .catch((error) => { console.log(`transaction error ${error}`) });
+
+
+        const receiverBalanceAfterCall = await publicClient.getBalance({ address: toViemAddress(wallet.address) })
+        assert.equal(receiverBalanceAfterCall, receiverBalance + raoToEth(tao(1)))
+    });
+
+    it("Forward value in smart contract", async () => {
+        const internalTx = api.tx.EVM.disable_whitelist({ disabled: true })
+        const tx = api.tx.Sudo.sudo({ call: internalTx.decodedCall })
+        await waitForTransactionCompletion(api, tx, alice)
+            .then(() => { })
+            .catch((error) => { console.log(`transaction error ${error}`) });
+
+        const contractFactory = new ethers.ContractFactory(WITHDRAW_CONTRACT_ABI, WITHDRAW_CONTRACT_BYTECODE, wallet)
+        const contract = await contractFactory.deploy()
+        await contract.waitForDeployment()
+
+        const code = await publicClient.getCode({ address: toViemAddress(contract.target.toString()) })
+        if (code === undefined) {
+            throw new Error("code length is wrong for deployed contract")
+        }
+        assert.ok(code.length > 100)
+
+        // transfer 2 TAO to contract
+        const ethTransfer = {
+            to: contract.target.toString(),
+            value: raoToEth(tao(2)).toString()
+        }
+
+        const txResponse = await wallet.sendTransaction(ethTransfer)
+        await txResponse.wait();
+
+        const contractBalance = await publicClient.getBalance({ address: toViemAddress(contract.target.toString()) })
+        const callerBalance = await publicClient.getBalance({ address: toViemAddress(wallet.address) })
+
+        const contractForCall = new ethers.Contract(contract.target.toString(), WITHDRAW_CONTRACT_ABI, wallet)
+
+        const withdrawTx = await contractForCall.withdraw(
+            raoToEth(tao(1)).toString()
+        );
+
+        await withdrawTx.wait();
+
+        const contractBalanceAfterWithdraw = await publicClient.getBalance({ address: toViemAddress(contract.target.toString()) })
+        const callerBalanceAfterWithdraw = await publicClient.getBalance({ address: toViemAddress(wallet.address) })
+
+        compareEthBalanceWithTxFee(callerBalanceAfterWithdraw, callerBalance + raoToEth(tao(1)))
+        assert.equal(contractBalance, contractBalanceAfterWithdraw + raoToEth(tao(1)))
     });
 });

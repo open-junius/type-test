@@ -96,10 +96,6 @@ export async function getPublicClient(url: ClientUrlType) {
     return wallet.extend(publicActions)
 }
 
-
-
-
-
 /**
  * Generates a random Ethereum wallet
  * @returns wallet keyring

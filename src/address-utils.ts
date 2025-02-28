@@ -71,3 +71,14 @@ export function ss58ToH160(ss58Address: string): Binary {
 
     return new Binary(ethereumAddressBytes);
 }
+
+export function ethAddressToH160(ethAddress: string): Binary {
+    // Decode the SS58 address to a Uint8Array public key
+    const publicKey = hexToU8a(ethAddress);
+
+    // Take the first 20 bytes of the hashed public key for the Ethereum address
+    // const ethereumAddressBytes = publicKey.slice(0, 20);
+
+
+    return new Binary(publicKey);
+}
