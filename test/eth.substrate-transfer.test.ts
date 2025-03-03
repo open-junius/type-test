@@ -2,15 +2,13 @@ import * as assert from "assert";
 import * as chai from "chai";
 
 import { getAliceSigner, getClient, getDevnetApi, waitForTransactionCompletion, convertPublicKeyToMultiAddress, getRandomSubstrateSigner, } from "../src/substrate"
-import { generateRandomEthWallet, getPublicClient, getTestClient, getWalletClient, } from "../src/utils";
-import { ETH_LOCAL_URL, SUB_LOCAL_URL, IBALANCETRANSFER_ADDRESS, IBalanceTransferABI, SIMPLE_PAYABLE_CONTRACT_ABI, SIMPLE_PAYABLE_CONTRACT_BYTECODE } from "../src/config";
+import { getPublicClient, getTestClient, getWalletClient, } from "../src/utils";
+import { ETH_LOCAL_URL, SUB_LOCAL_URL, IBALANCETRANSFER_ADDRESS, IBalanceTransferABI } from "../src/config";
 import { devnet, MultiAddress } from "@polkadot-api/descriptors"
-import { getPolkadotSigner } from "polkadot-api/signer";
-import { PublicClient, WalletClient, toBytes } from "viem";
+import { PublicClient, WalletClient } from "viem";
 import { PolkadotSigner, TypedApi, Binary, FixedSizeBinary } from "polkadot-api";
-import { wagmiContract } from "../src/bridgeToken";
 import { generateRandomEthersWallet } from "../src/utils";
-import { tao, raoToEth, compareEthBalanceWithTxFee } from "../src/balance-math";
+import { tao, raoToEth, bigintToRao, compareEthBalanceWithTxFee } from "../src/balance-math";
 import { toViemAddress, convertSs58ToMultiAddress, convertPublicKeyToSs58, convertH160ToSS58, ss58ToH160, ss58ToEthAddress, ethAddressToH160 } from "../src/address-utils"
 import { ethers } from "ethers"
 import { estimateTransactionCost, getContract } from "../src/eth"
@@ -18,10 +16,10 @@ import { estimateTransactionCost, getContract } from "../src/eth"
 import { WITHDRAW_CONTRACT_ABI, WITHDRAW_CONTRACT_BYTECODE } from "../src/contracts/withdraw"
 
 describe("Balance transfers between substrate and EVM", () => {
+    const gwei = BigInt("1000000000");
     // init eth part
     const wallet = generateRandomEthersWallet();
     const wallet2 = generateRandomEthersWallet();
-    let ethClient: WalletClient;
     let publicClient: PublicClient;
     const provider = new ethers.JsonRpcProvider(ETH_LOCAL_URL);
     // init substrate part
@@ -234,4 +232,212 @@ describe("Balance transfers between substrate and EVM", () => {
         compareEthBalanceWithTxFee(callerBalanceAfterWithdraw, callerBalance + raoToEth(tao(1)))
         assert.equal(contractBalance, contractBalanceAfterWithdraw + raoToEth(tao(1)))
     });
+
+    it("Transfer full balance", async () => {
+        const ethBalance = await publicClient.getBalance({ address: toViemAddress(wallet.address) })
+        const receiverBalance = await publicClient.getBalance({ address: toViemAddress(wallet2.address) })
+        const tx = {
+            to: wallet2.address,
+            value: ethBalance.toString(),
+        };
+        const txPrice = await estimateTransactionCost(provider, tx);
+        const finalTx = {
+            to: wallet2.address,
+            value: (ethBalance - txPrice).toString(),
+        };
+        try {
+            // transfer should be failed since substrate requires existial balance to keep account
+            const txResponse = await wallet.sendTransaction(finalTx)
+            await txResponse.wait();
+        } catch (error) {
+            if (error instanceof Error) {
+                assert.equal((error as any).code, "INSUFFICIENT_FUNDS")
+                assert.equal(error.toString().includes("insufficient funds"), true)
+            }
+        }
+
+        const receiverBalanceAfterTransfer = await publicClient.getBalance({ address: toViemAddress(wallet2.address) })
+        assert.equal(receiverBalance, receiverBalanceAfterTransfer)
+    })
+
+    it("Transfer more than owned balance should fail", async () => {
+        const ethBalance = await publicClient.getBalance({ address: toViemAddress(wallet.address) })
+        const receiverBalance = await publicClient.getBalance({ address: toViemAddress(wallet2.address) })
+        const tx = {
+            to: wallet2.address,
+            value: (ethBalance + raoToEth(tao(1))).toString(),
+        };
+
+        try {
+            // transfer should be failed since substrate requires existial balance to keep account
+            const txResponse = await wallet.sendTransaction(tx)
+            await txResponse.wait();
+        } catch (error) {
+            if (error instanceof Error) {
+                assert.equal((error as any).code, "INSUFFICIENT_FUNDS")
+                assert.equal(error.toString().includes("insufficient funds"), true)
+            }
+        }
+
+        const receiverBalanceAfterTransfer = await publicClient.getBalance({ address: toViemAddress(wallet2.address) })
+        assert.equal(receiverBalance, receiverBalanceAfterTransfer)
+    });
+
+    it("Transfer more than u64::max in substrate equivalent should receive error response", async () => {
+        const receiverBalance = await publicClient.getBalance({ address: toViemAddress(wallet2.address) })
+        try {
+            const tx = {
+                to: wallet2.address,
+                value: raoToEth(BigInt(2) ** BigInt(64)).toString(),
+            };
+            // transfer should be failed since substrate requires existial balance to keep account
+            const txResponse = await wallet.sendTransaction(tx)
+            await txResponse.wait();
+        } catch (error) {
+            if (error instanceof Error) {
+                assert.equal((error as any).code, "INSUFFICIENT_FUNDS")
+                assert.equal(error.toString().includes("insufficient funds"), true)
+            }
+        }
+
+
+
+        const contract = getContract(IBALANCETRANSFER_ADDRESS, IBalanceTransferABI, wallet)
+        try {
+            const tx = await contract.transfer(signer.publicKey, { value: raoToEth(BigInt(2) ** BigInt(64)).toString() })
+            await tx.await()
+        } catch (error) {
+            if (error instanceof Error) {
+                console.log(error.toString())
+                assert.equal(error.toString().includes("revert data"), true)
+            }
+        }
+
+        try {
+            const dest = convertH160ToSS58(wallet2.address)
+            const tx = api.tx.Balances.transfer_keep_alive({ value: bigintToRao(BigInt(2) ** BigInt(64)), dest: MultiAddress.Id(dest) })
+            await waitForTransactionCompletion(api, tx, signer)
+                .then(() => { })
+                .catch((error) => { console.log(`transaction error ${error}`) });
+        } catch (error) {
+            if (error instanceof Error) {
+                console.log(error.toString())
+                assert.equal(error.toString().includes("Cannot convert"), true)
+            }
+        }
+
+        try {
+            const dest = ethAddressToH160(wallet2.address)
+            const tx = api.tx.EVM.withdraw({ value: bigintToRao(BigInt(2) ** BigInt(64)), address: dest })
+            await waitForTransactionCompletion(api, tx, signer)
+                .then(() => { })
+                .catch((error) => { console.log(`transaction error ${error}`) });
+        } catch (error) {
+            if (error instanceof Error) {
+                assert.equal(error.toString().includes("Cannot convert"), true)
+            }
+        }
+
+        try {
+            const source = ethAddressToH160(wallet.address)
+            const target = ethAddressToH160(wallet2.address)
+            const tx = api.tx.EVM.call({
+                source: source,
+                target: target,
+                // it is U256 in the extrinsic, the value is more than u64::MAX
+                value: [raoToEth(tao(1)), tao(0), tao(0), tao(1)],
+                gas_limit: BigInt(1000000),
+                // it is U256 in the extrinsic. 
+                max_fee_per_gas: [BigInt(10e9), BigInt(0), BigInt(0), BigInt(0)],
+                max_priority_fee_per_gas: undefined,
+                input: Binary.fromText(""),
+                nonce: undefined,
+                access_list: []
+            })
+            await waitForTransactionCompletion(api, tx, signer)
+                .then(() => { })
+                .catch((error) => { console.log(`transaction error ${error}`) });
+        } catch (error) {
+            if (error instanceof Error) {
+                console.log(error.toString())
+                assert.equal((error as any).code, "INSUFFICIENT_FUNDS")
+                assert.equal(error.toString().includes("insufficient funds"), true)
+            }
+        }
+
+        const receiverBalanceAfterTransfer = await publicClient.getBalance({ address: toViemAddress(wallet2.address) })
+        assert.equal(receiverBalance, receiverBalanceAfterTransfer)
+    });
+
+    it("Gas price should be 10 GWei", async () => {
+        const feeData = await provider.getFeeData();
+        assert.equal(feeData.gasPrice, BigInt(10000000000));
+    });
+
+
+    it("max_fee_per_gas and max_priority_fee_per_gas affect transaction fee properly", async () => {
+
+        const testCases = [
+            [10, 0, 21000 * 10 * 1e9],
+            [10, 10, 21000 * 10 * 1e9],
+            [11, 0, 21000 * 10 * 1e9],
+            [11, 1, (21000 * 10 + 21000) * 1e9],
+            [11, 2, (21000 * 10 + 21000) * 1e9],
+        ];
+
+        for (let i in testCases) {
+            const tc = testCases[i];
+            const actualFee = await transferAndGetFee(
+                wallet, wallet2, publicClient,
+                gwei * BigInt(tc[0]),
+                gwei * BigInt(tc[1])
+            );
+            assert.equal(actualFee, BigInt(tc[2]))
+        }
+    });
+
+    it("Low max_fee_per_gas gets transaction rejected", async () => {
+        try {
+            await transferAndGetFee(wallet, wallet2, publicClient, gwei * BigInt(9), BigInt(0))
+        } catch (error) {
+            if (error instanceof Error) {
+                console.log(error.toString())
+                assert.equal(error.toString().includes("gas price less than block base fee"), true)
+            }
+        }
+    });
+
+    it("max_fee_per_gas lower than max_priority_fee_per_gas gets transaction rejected", async () => {
+        try {
+            await transferAndGetFee(wallet, wallet2, publicClient, gwei * BigInt(10), gwei * BigInt(11))
+        } catch (error) {
+            if (error instanceof Error) {
+                assert.equal(error.toString().includes("priorityFee cannot be more than maxFee"), true)
+            }
+        }
+    });
 });
+
+async function transferAndGetFee(wallet: ethers.Wallet, wallet2: ethers.Wallet, client: PublicClient, max_fee_per_gas: BigInt, max_priority_fee_per_gas: BigInt) {
+
+    const ethBalanceBefore = await client.getBalance({ address: toViemAddress(wallet.address) })
+    // Send TAO
+    const tx = {
+        to: wallet2.address,
+        value: raoToEth(tao(1)).toString(),
+        // EIP-1559 transaction parameters
+        maxPriorityFeePerGas: max_priority_fee_per_gas.toString(),
+        maxFeePerGas: max_fee_per_gas.toString(),
+        gasLimit: 21000,
+    };
+
+    // Send the transaction
+    const txResponse = await wallet.sendTransaction(tx);
+    await txResponse.wait()
+
+    // Check balances
+    const ethBalanceAfter = await client.getBalance({ address: toViemAddress(wallet.address) })
+    const fee = ethBalanceBefore - ethBalanceAfter - raoToEth(tao(1))
+
+    return fee;
+}
