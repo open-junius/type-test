@@ -1,13 +1,10 @@
 import * as assert from "assert";
-import * as chai from "chai";
 
-import { getAliceSigner, getClient, getDevnetApi, waitForTransactionCompletion, convertPublicKeyToMultiAddress, getRandomSubstrateKeypair, getSignerFromKeypair } from "../src/substrate"
-import { getPublicClient, } from "../src/utils";
-import { ETH_LOCAL_URL, SUB_LOCAL_URL, } from "../src/config";
+import { getAliceSigner, getClient, getDevnetApi, waitForTransactionCompletion, convertPublicKeyToMultiAddress, getRandomSubstrateKeypair } from "../src/substrate"
+import { SUB_LOCAL_URL, } from "../src/config";
 import { devnet, MultiAddress } from "@polkadot-api/descriptors"
-import { PublicClient } from "viem";
 import { PolkadotSigner, TypedApi } from "polkadot-api";
-import { toViemAddress, convertPublicKeyToSs58, convertH160ToSS58 } from "../src/address-utils"
+import { convertH160ToSS58 } from "../src/address-utils"
 import { generateRandomEthersWallet } from "../src/utils";
 import { tao } from "../src/balance-math"
 import { ISubnetABI, ISUBNET_ADDRESS } from "../src/contracts/subnet"
@@ -19,10 +16,8 @@ describe("Test the EVM chain ID", () => {
     // init substrate part
     const hotkey1 = getRandomSubstrateKeypair();
     const hotkey2 = getRandomSubstrateKeypair();
-    let publicClient: PublicClient;
 
     let api: TypedApi<typeof devnet>
-
     // sudo account alice as signer
     let alice: PolkadotSigner;
 
@@ -31,7 +26,6 @@ describe("Test the EVM chain ID", () => {
 
     before(async () => {
         // init variables got from await and async
-        publicClient = await getPublicClient(ETH_LOCAL_URL)
         const subClient = await getClient(SUB_LOCAL_URL)
         api = await getDevnetApi(subClient)
         alice = await getAliceSigner();
@@ -181,9 +175,6 @@ describe("Test the EVM chain ID", () => {
             assert.equal(valueFromContract, newValue)
             assert.equal(valueFromContract, onchainValue);
         }
-
-
-
         // weightsSetRateLimit hyperparameter
         {
             const newValue = 104;
@@ -201,7 +192,6 @@ describe("Test the EVM chain ID", () => {
             assert.equal(valueFromContract, onchainValue);
         }
 
-
         // adjustmentAlpha hyperparameter
         {
             const newValue = 105;
@@ -218,7 +208,6 @@ describe("Test the EVM chain ID", () => {
             assert.equal(valueFromContract, newValue)
             assert.equal(valueFromContract, onchainValue);
         }
-
 
         // maxWeightLimit hyperparameter
         {
@@ -270,8 +259,6 @@ describe("Test the EVM chain ID", () => {
             assert.equal(valueFromContract, onchainValue);
         }
 
-
-
         // kappa hyperparameter
         {
             const newValue = 109;
@@ -288,7 +275,6 @@ describe("Test the EVM chain ID", () => {
             assert.equal(valueFromContract, newValue)
             assert.equal(valueFromContract, onchainValue);
         }
-
 
         // rho hyperparameter
         {
@@ -307,7 +293,6 @@ describe("Test the EVM chain ID", () => {
             assert.equal(valueFromContract, onchainValue);
         }
 
-
         // activityCutoff hyperparameter
         {
             const newValue = 111;
@@ -325,8 +310,6 @@ describe("Test the EVM chain ID", () => {
             assert.equal(valueFromContract, onchainValue);
         }
 
-
-
         // networkRegistrationAllowed hyperparameter
         {
             const newValue = true;
@@ -343,8 +326,6 @@ describe("Test the EVM chain ID", () => {
             assert.equal(valueFromContract, newValue)
             assert.equal(valueFromContract, onchainValue);
         }
-
-
 
         // networkPowRegistrationAllowed hyperparameter
         {
