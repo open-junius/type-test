@@ -1,5 +1,3 @@
-
-
 import * as assert from "assert";
 import * as chai from "chai";
 
@@ -11,7 +9,7 @@ import { getPolkadotSigner } from "polkadot-api/signer";
 import { PublicClient, WalletClient, toBytes } from "viem";
 import { PolkadotSigner, TypedApi, Binary, FixedSizeBinary } from "polkadot-api";
 import { wagmiContract } from "../src/bridgeToken";
-import { convertH160ToSS58 } from "../src/utils";
+import { convertH160ToSS58 } from "../src/address-utils";
 
 describe("bridge token contract deployment", () => {
     // init eth part
