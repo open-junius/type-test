@@ -1,31 +1,34 @@
 import * as assert from "assert";
 import * as chai from "chai";
 
-import { getAliceSigner, getClient, getDevnetApi, waitForTransactionCompletion, convertPublicKeyToMultiAddress, getRandomSubstrateKeypair, getSignerFromKeypair } from "../src/substrate"
+import { getAliceSigner, getClient, getDevnetApi, getRandomSubstrateKeypair } from "../src/substrate"
 import { getPublicClient, } from "../src/utils";
 import { ETH_LOCAL_URL, SUB_LOCAL_URL, } from "../src/config";
 import { devnet, MultiAddress } from "@polkadot-api/descriptors"
 import { PublicClient, walletActions } from "viem";
 import { PolkadotSigner, TypedApi } from "polkadot-api";
-import { toViemAddress, convertPublicKeyToSs58, convertH160ToSS58 } from "../src/address-utils"
-import { decodeAddress } from "@polkadot/util-crypto";
+import { convertPublicKeyToSs58, convertH160ToSS58 } from "../src/address-utils"
 import { Vec, Tuple, VecFixed, u16, u8, u64 } from "@polkadot/types-codec";
 import { TypeRegistry } from "@polkadot/types";
 import { ethers } from "ethers"
 import { INEURON_ADDRESS, INeuronABI } from "../src/contracts/neuron"
 import { generateRandomEthersWallet } from "../src/utils"
 import { convertH160ToPublicKey } from "../src/address-utils"
-import { blake2AsU8a } from "@polkadot/util-crypto";
+import { blake2AsU8a } from "@polkadot/util-crypto"
+import {
+    forceSetBalanceToEthAddress, forceSetBalanceToSs58Address, addNewSubnetwork, setCommitRevealWeightsEnabled, setWeightsSetRateLimit, burnedRegister,
+    setTempo, setCommitRevealWeightsInterval
+} from "../src/subtensor"
+
+// hardcode some values for reveal hash
+const uids = [1];
+const values = [5];
+const salt = [9];
+const version_key = 0;
 
 function getCommitHash(netuid: number, address: string) {
     const registry = new TypeRegistry();
-    const uids = [1];
-    const values = [5];
-    const salt = [9];
-    const version_key = 0;
-
     let publicKey = convertH160ToPublicKey(address);
-    console.log(publicKey);
 
     const tupleData = new Tuple(
         registry,
@@ -40,26 +43,23 @@ function getCommitHash(netuid: number, address: string) {
         [publicKey, netuid, uids, values, salt, version_key]
     );
 
-    console.log("Encoded Array:", tupleData.toU8a());
-
     const hash = blake2AsU8a(tupleData.toU8a());
-    console.log(hash);
     return hash;
 }
 
-describe("Test the EVM chain ID", () => {
+describe("Test neuron precompile reveal weights", () => {
     // init eth part
     const wallet = generateRandomEthersWallet();
 
     // init substrate part
     const hotkey = getRandomSubstrateKeypair();
+    const coldkey = getRandomSubstrateKeypair();
     let publicClient: PublicClient;
 
     let api: TypedApi<typeof devnet>
 
     // sudo account alice as signer
     let alice: PolkadotSigner;
-
     before(async () => {
         // init variables got from await and async
         publicClient = await getPublicClient(ETH_LOCAL_URL)
@@ -67,66 +67,86 @@ describe("Test the EVM chain ID", () => {
         api = await getDevnetApi(subClient)
         alice = await getAliceSigner();
 
-        {
-            const multiAddress = convertPublicKeyToMultiAddress(hotkey.publicKey)
-            const internalCall = api.tx.Balances.force_set_balance({ who: multiAddress, new_free: BigInt(1e12) })
-            const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
+        await forceSetBalanceToSs58Address(api, convertPublicKeyToSs58(alice.publicKey))
+        await forceSetBalanceToSs58Address(api, convertPublicKeyToSs58(hotkey.publicKey))
+        await forceSetBalanceToSs58Address(api, convertPublicKeyToSs58(coldkey.publicKey))
+        await forceSetBalanceToEthAddress(api, wallet.address)
+        let netuid = await addNewSubnetwork(api, hotkey, coldkey)
 
-            await waitForTransactionCompletion(api, tx, alice)
-                .then(() => { })
-                .catch((error) => { console.log(`transaction error ${error}`) });
-        }
+        console.log("test the case on subnet ", netuid)
 
-        {
-            const ss58Address = convertH160ToSS58(wallet.address)
-            const internalCall = api.tx.Balances.force_set_balance({ who: MultiAddress.Id(ss58Address), new_free: BigInt(1e12) })
-            const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
+        // enable commit reveal feature
+        await setCommitRevealWeightsEnabled(api, netuid, true)
+        // set it as 0, we can set the weight anytime
+        await setWeightsSetRateLimit(api, netuid, BigInt(0))
 
-            await waitForTransactionCompletion(api, tx, alice)
-                .then(() => { })
-                .catch((error) => { console.log(`transaction error ${error}`) });
-        }
+        const ss58Address = convertH160ToSS58(wallet.address)
+        await burnedRegister(api, netuid, ss58Address, coldkey)
 
-        let totalNetworks = await api.query.SubtensorModule.TotalNetworks.getValue()
-        assert.ok(totalNetworks > 1)
-        const subnetId = totalNetworks - 1
+        const uid = await api.query.SubtensorModule.Uids.getValue(
+            netuid,
+            ss58Address
+        )
+        // eth wallet account should be the first neuron in the subnet
+        assert.equal(uid, uids[0])
 
-        let uid_count =
-            await api.query.SubtensorModule.SubnetworkN.getValue(subnetId)
-        if (uid_count === 0) {
-            const tx = api.tx.SubtensorModule.burned_register({ hotkey: convertPublicKeyToSs58(hotkey.publicKey), netuid: subnetId })
-            await waitForTransactionCompletion(api, tx, alice)
-                .then(() => { })
-                .catch((error) => { console.log(`transaction error ${error}`) });
-        }
     })
 
-    it("Burned register and check emission", async () => {
+    it("EVM neuron commit weights via call precompile", async () => {
         let totalNetworks = await api.query.SubtensorModule.TotalNetworks.getValue()
         const subnetId = totalNetworks - 1
-        const uid = await api.query.SubtensorModule.SubnetworkN.getValue(subnetId)
+        const commitHash = getCommitHash(subnetId, wallet.address)
         const contract = new ethers.Contract(INEURON_ADDRESS, INeuronABI, wallet);
+        const tx = await contract.commitWeights(subnetId, commitHash)
+        await tx.wait()
 
-        const tx = await contract.burnedRegister(
-            subnetId,
-            hotkey.publicKey
-        );
-        await tx.wait();
+        const ss58Address = convertH160ToSS58(wallet.address)
 
-        const uidAfterNew = await api.query.SubtensorModule.SubnetworkN.getValue(subnetId)
-        assert.equal(uid + 1, uidAfterNew)
-
-        const key = await api.query.SubtensorModule.Keys.getValue(subnetId, uid)
-        assert.equal(key, convertPublicKeyToSs58(hotkey.publicKey))
-
-        let i = 0;
-        while (i < 10) {
-            const emission = await api.query.SubtensorModule.PendingEmission.getValue(subnetId)
-
-            console.log("emission is ", emission);
-            await new Promise((resolve) => setTimeout(resolve, 2000));
-            assert.ok(emission > BigInt(0))
-            i += 1;
+        const weightsCommit = await api.query.SubtensorModule.WeightCommits.getValue(subnetId, ss58Address)
+        if (weightsCommit === undefined) {
+            throw new Error("submit weights failed")
         }
+        assert.ok(weightsCommit.length > 0)
+    })
+
+    it("EVM neuron reveal weights via call precompile", async () => {
+        let totalNetworks = await api.query.SubtensorModule.TotalNetworks.getValue()
+        const netuid = totalNetworks - 1
+        const contract = new ethers.Contract(INEURON_ADDRESS, INeuronABI, wallet);
+        // set tempo or epoch large, then enough time to reveal weight
+        await setTempo(api, netuid, 60000)
+        // set interval epoch as 0, we can reveal at the same epoch
+        await setCommitRevealWeightsInterval(api, netuid, BigInt(0))
+
+        const tx = await contract.revealWeights(
+            netuid,
+            uids,
+            values,
+            salt,
+            version_key
+        );
+        await tx.wait()
+        const ss58Address = convertH160ToSS58(wallet.address)
+
+        // check the weight commit is removed after reveal successfully
+        const weightsCommit = await api.query.SubtensorModule.WeightCommits.getValue(netuid, ss58Address)
+        assert.equal(weightsCommit, undefined)
+
+        // check the weight is set after reveal with correct uid
+        const neuron_uid = await api.query.SubtensorModule.Uids.getValue(
+            netuid,
+            ss58Address
+        )
+
+        const weights = await api.query.SubtensorModule.Weights.getValue(netuid, neuron_uid)
+
+        if (weights === undefined) {
+            throw new Error("weights not available onchain")
+        }
+        for (const weight of weights) {
+            assert.equal(weight[0], neuron_uid)
+            assert.ok(weight[1] !== undefined)
+        }
+
     })
 });

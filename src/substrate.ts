@@ -1,3 +1,4 @@
+import * as assert from "assert";
 import { devnet, MultiAddress } from '@polkadot-api/descriptors';
 import { createClient, PolkadotClient, TypedApi, Transaction, PolkadotSigner, Binary } from 'polkadot-api';
 import { getWsProvider } from 'polkadot-api/ws-provider/web';
@@ -49,6 +50,30 @@ export function getAliceSigner() {
     )
 
     return polkadotSigner
+}
+
+// create a new subnet and return netuid 
+export async function addNewSubnetwork(api: TypedApi<typeof devnet>, hotkey: KeyPair, coldkey: KeyPair) {
+    const alice = getAliceSigner()
+    const totalNetworks = await api.query.SubtensorModule.TotalNetworks.getValue()
+
+    const rateLimit = await api.query.SubtensorModule.NetworkRateLimit.getValue()
+    if (rateLimit !== BigInt(0)) {
+        const internalCall = api.tx.AdminUtils.sudo_set_network_rate_limit({ rate_limit: BigInt(0) })
+        const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
+        await waitForTransactionCompletion(api, tx, alice)
+            .then(() => { })
+            .catch((error) => { console.log(`transaction error ${error}`) });
+    }
+
+    const signer = getSignerFromKeypair(coldkey)
+    const registerNetworkTx = api.tx.SubtensorModule.register_network({ hotkey: convertPublicKeyToSs58(hotkey.publicKey) })
+    await waitForTransactionCompletion(api, registerNetworkTx, signer)
+        .then(() => { })
+        .catch((error) => { console.log(`transaction error ${error}`) });
+
+    assert.equal(totalNetworks + 1, await api.query.SubtensorModule.TotalNetworks.getValue())
+    return totalNetworks
 }
 
 export function getRandomSubstrateSigner() {
