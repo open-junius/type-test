@@ -1,12 +1,11 @@
 import * as assert from "assert";
-import * as chai from "chai";
 
 import { getDevnetApi, waitForTransactionCompletion, getRandomSubstrateSigner, } from "../src/substrate"
-import { getPublicClient, getTestClient, getWalletClient, } from "../src/utils";
-import { ETH_LOCAL_URL, SUB_LOCAL_URL, IBALANCETRANSFER_ADDRESS, IBalanceTransferABI } from "../src/config";
+import { getPublicClient } from "../src/utils";
+import { ETH_LOCAL_URL, IBALANCETRANSFER_ADDRESS, IBalanceTransferABI } from "../src/config";
 import { devnet, MultiAddress } from "@polkadot-api/descriptors"
-import { PublicClient, WalletClient } from "viem";
-import { PolkadotSigner, TypedApi, Binary, FixedSizeBinary } from "polkadot-api";
+import { PublicClient } from "viem";
+import { TypedApi, Binary, FixedSizeBinary } from "polkadot-api";
 import { generateRandomEthersWallet } from "../src/utils";
 import { tao, raoToEth, bigintToRao, compareEthBalanceWithTxFee } from "../src/balance-math";
 import { toViemAddress, convertSs58ToMultiAddress, convertPublicKeyToSs58, convertH160ToSS58, ss58ToH160, ss58ToEthAddress, ethAddressToH160 } from "../src/address-utils"

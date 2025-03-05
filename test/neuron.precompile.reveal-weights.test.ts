@@ -1,8 +1,7 @@
 import * as assert from "assert";
-import { getAliceSigner, getClient, getDevnetApi, getRandomSubstrateKeypair } from "../src/substrate"
-import { SUB_LOCAL_URL, } from "../src/config";
+import { getAliceSigner, getDevnetApi, getRandomSubstrateKeypair } from "../src/substrate"
 import { devnet } from "@polkadot-api/descriptors"
-import { PolkadotClient, PolkadotSigner, TypedApi } from "polkadot-api";
+import { PolkadotSigner, TypedApi } from "polkadot-api";
 import { convertPublicKeyToSs58, convertH160ToSS58 } from "../src/address-utils"
 import { Vec, Tuple, VecFixed, u16, u8, u64 } from "@polkadot/types-codec";
 import { TypeRegistry } from "@polkadot/types";

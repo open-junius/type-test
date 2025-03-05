@@ -2,9 +2,9 @@
 import * as assert from "assert";
 import * as chai from "chai";
 
-import { getAliceSigner, getClient, getDevnetApi, waitForTransactionCompletion, convertPublicKeyToMultiAddress, getRandomSubstrateKeypair, convertPublicKeyToSs58 } from "../src/substrate"
+import { getAliceSigner, getDevnetApi, waitForTransactionCompletion, getRandomSubstrateKeypair, convertPublicKeyToSs58 } from "../src/substrate"
 import { generateRandomEthWallet, getWalletClient } from "../src/utils";
-import { ETH_LOCAL_URL, SUB_LOCAL_URL } from "../src/config";
+import { ETH_LOCAL_URL } from "../src/config";
 import { devnet } from "@polkadot-api/descriptors"
 import { getPolkadotSigner } from "polkadot-api/signer";
 import { WalletClient } from "viem";

@@ -1,16 +1,13 @@
 import * as assert from "assert";
 
-import { getAliceSigner, getClient, getDevnetApi, waitForTransactionCompletion, convertPublicKeyToMultiAddress, getRandomSubstrateKeypair } from "../src/substrate"
-import { SUB_LOCAL_URL, } from "../src/config";
-import { devnet, MultiAddress } from "@polkadot-api/descriptors"
-import { PolkadotSigner, TypedApi } from "polkadot-api";
-import { convertH160ToSS58, convertPublicKeyToSs58 } from "../src/address-utils"
+import { getDevnetApi, getRandomSubstrateKeypair } from "../src/substrate"
+import { devnet } from "@polkadot-api/descriptors"
+import { TypedApi } from "polkadot-api";
+import { convertPublicKeyToSs58 } from "../src/address-utils"
 import { generateRandomEthersWallet } from "../src/utils";
-
-import { tao } from "../src/balance-math"
 import { ISubnetABI, ISUBNET_ADDRESS } from "../src/contracts/subnet"
 import { ethers } from "ethers"
-import { forceSetBalanceToEthAddress, forceSetBalanceToSs58Address, addNewSubnetwork } from "../src/subtensor"
+import { forceSetBalanceToEthAddress, forceSetBalanceToSs58Address } from "../src/subtensor"
 
 describe("Test the EVM chain ID", () => {
     // init eth part

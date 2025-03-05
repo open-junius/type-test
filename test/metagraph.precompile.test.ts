@@ -1,5 +1,4 @@
 import * as assert from "assert";
-import * as chai from "chai";
 
 import { getAliceSigner, getClient, getDevnetApi, waitForTransactionCompletion, convertPublicKeyToMultiAddress, getRandomSubstrateKeypair, getSignerFromKeypair } from "../src/substrate"
 import { getPublicClient, } from "../src/utils";
@@ -8,13 +7,9 @@ import { devnet } from "@polkadot-api/descriptors"
 import { PublicClient } from "viem";
 import { PolkadotSigner, TypedApi } from "polkadot-api";
 import { toViemAddress, convertPublicKeyToSs58 } from "../src/address-utils"
-
-
 import { IMetagraphABI, IMETAGRAPH_ADDRESS } from "../src/contracts/metagraph"
 
-
 describe("Test the EVM chain ID", () => {
-
     // init substrate part
     const hotkey = getRandomSubstrateKeypair();
     const coldkey = getRandomSubstrateKeypair();

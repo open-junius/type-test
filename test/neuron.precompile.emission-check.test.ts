@@ -1,5 +1,4 @@
 import * as assert from "assert";
-import * as chai from "chai";
 
 import { getAliceSigner, getClient, getDevnetApi, getRandomSubstrateKeypair } from "../src/substrate"
 import { getPublicClient, } from "../src/utils";

@@ -4,17 +4,10 @@ import { SUB_LOCAL_URL, } from "../src/config";
 import { devnet } from "@polkadot-api/descriptors"
 import { PolkadotSigner, TypedApi } from "polkadot-api";
 import { convertPublicKeyToSs58, convertH160ToSS58 } from "../src/address-utils"
-import { Vec, Tuple, VecFixed, u16, u8, u64 } from "@polkadot/types-codec";
-import { TypeRegistry } from "@polkadot/types";
 import { ethers } from "ethers"
 import { INEURON_ADDRESS, INeuronABI } from "../src/contracts/neuron"
 import { generateRandomEthersWallet } from "../src/utils"
-import { convertH160ToPublicKey } from "../src/address-utils"
-import { blake2AsU8a } from "@polkadot/util-crypto"
-import {
-    forceSetBalanceToEthAddress, forceSetBalanceToSs58Address, addNewSubnetwork, setCommitRevealWeightsEnabled, setWeightsSetRateLimit, burnedRegister,
-    setTempo, setCommitRevealWeightsInterval
-} from "../src/subtensor"
+import { forceSetBalanceToEthAddress, forceSetBalanceToSs58Address, addNewSubnetwork, burnedRegister } from "../src/subtensor"
 
 describe("Test neuron precompile Serve Axon Prometheus", () => {
     // init eth part

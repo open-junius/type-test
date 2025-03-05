@@ -1,15 +1,14 @@
 import * as assert from "assert";
 import * as chai from "chai";
 
-import { getAliceSigner, getClient, getDevnetApi, waitForTransactionCompletion, convertPublicKeyToMultiAddress, getRandomSubstrateKeypair } from "../src/substrate"
-import { generateRandomEthersWallet, getPublicClient, getWalletClient } from "../src/utils";
-import { ETH_LOCAL_URL, SUB_LOCAL_URL } from "../src/config";
-import { devnet, MultiAddress } from "@polkadot-api/descriptors"
-import { getPolkadotSigner } from "polkadot-api/signer";
-import { PublicClient, WalletClient, toBytes } from "viem";
-import { PolkadotSigner, TypedApi, Binary, FixedSizeBinary } from "polkadot-api";
+import { getDevnetApi } from "../src/substrate"
+import { generateRandomEthersWallet, getPublicClient } from "../src/utils";
+import { ETH_LOCAL_URL } from "../src/config";
+import { devnet } from "@polkadot-api/descriptors"
+import { PublicClient } from "viem";
+import { TypedApi } from "polkadot-api";
 import { wagmiContract } from "../src/bridgeToken";
-import { convertH160ToSS58, toViemAddress } from "../src/address-utils";
+import { toViemAddress } from "../src/address-utils";
 import { forceSetBalanceToEthAddress, disableWhiteListCheck } from "../src/subtensor";
 import { ethers } from "ethers"
 describe("bridge token contract deployment", () => {

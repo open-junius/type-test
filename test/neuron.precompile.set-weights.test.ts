@@ -1,10 +1,8 @@
 import * as assert from "assert";
-import * as chai from "chai";
 
-import { getClient, getDevnetApi, getRandomSubstrateKeypair } from "../src/substrate"
-import { SUB_LOCAL_URL, } from "../src/config";
+import { getDevnetApi, getRandomSubstrateKeypair } from "../src/substrate"
 import { devnet } from "@polkadot-api/descriptors"
-import { PolkadotClient, TypedApi } from "polkadot-api";
+import { TypedApi } from "polkadot-api";
 import { convertH160ToSS58, convertPublicKeyToSs58, } from "../src/address-utils"
 import { ethers } from "ethers"
 import { INEURON_ADDRESS, INeuronABI } from "../src/contracts/neuron"
