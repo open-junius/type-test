@@ -4,69 +4,30 @@ import { getAliceSigner, getClient, getDevnetApi, waitForTransactionCompletion, 
 import { SUB_LOCAL_URL, } from "../src/config";
 import { devnet, MultiAddress } from "@polkadot-api/descriptors"
 import { PolkadotSigner, TypedApi } from "polkadot-api";
-import { convertH160ToSS58 } from "../src/address-utils"
+import { convertH160ToSS58, convertPublicKeyToSs58 } from "../src/address-utils"
 import { generateRandomEthersWallet } from "../src/utils";
+
 import { tao } from "../src/balance-math"
 import { ISubnetABI, ISUBNET_ADDRESS } from "../src/contracts/subnet"
 import { ethers } from "ethers"
+import { forceSetBalanceToEthAddress, forceSetBalanceToSs58Address, addNewSubnetwork } from "../src/subtensor"
 
 describe("Test the EVM chain ID", () => {
     // init eth part
     const wallet = generateRandomEthersWallet();
     // init substrate part
+
     const hotkey1 = getRandomSubstrateKeypair();
     const hotkey2 = getRandomSubstrateKeypair();
-
     let api: TypedApi<typeof devnet>
-    // sudo account alice as signer
-    let alice: PolkadotSigner;
-
-    // init other variable
-    let subnetId = 0;
 
     before(async () => {
         // init variables got from await and async
-        const subClient = await getClient(SUB_LOCAL_URL)
-        api = await getDevnetApi(subClient)
-        alice = await getAliceSigner();
+        api = await getDevnetApi()
 
-        {
-            const multiAddress = convertPublicKeyToMultiAddress(hotkey1.publicKey)
-            const internalCall = api.tx.Balances.force_set_balance({ who: multiAddress, new_free: tao(1000000) })
-            const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
-
-            await waitForTransactionCompletion(api, tx, alice)
-                .then(() => { })
-                .catch((error) => { console.log(`transaction error ${error}`) });
-        }
-
-        {
-            const multiAddress = convertPublicKeyToMultiAddress(hotkey2.publicKey)
-            const internalCall = api.tx.Balances.force_set_balance({ who: multiAddress, new_free: tao(1000000) })
-            const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
-
-            await waitForTransactionCompletion(api, tx, alice)
-                .then(() => { })
-                .catch((error) => { console.log(`transaction error ${error}`) });
-        }
-
-        {
-            const ss58Address = convertH160ToSS58(wallet.address)
-            const internalCall = api.tx.Balances.force_set_balance({ who: MultiAddress.Id(ss58Address), new_free: tao(1000000) })
-            const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
-
-            await waitForTransactionCompletion(api, tx, alice)
-                .then(() => { })
-                .catch((error) => { console.log(`transaction error ${error}`) });
-        }
-
-        {
-            const internalCall = api.tx.AdminUtils.sudo_set_network_rate_limit({ rate_limit: BigInt(0) })
-            const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
-            await waitForTransactionCompletion(api, tx, alice)
-                .then(() => { })
-                .catch((error) => { console.log(`transaction error ${error}`) });
-        }
+        await forceSetBalanceToSs58Address(api, convertPublicKeyToSs58(hotkey1.publicKey))
+        await forceSetBalanceToSs58Address(api, convertPublicKeyToSs58(hotkey2.publicKey))
+        await forceSetBalanceToEthAddress(api, wallet.address)
     })
 
     it("Can register network without identity info", async () => {
@@ -103,19 +64,19 @@ describe("Test the EVM chain ID", () => {
 
         const totalNetwork = await api.query.SubtensorModule.TotalNetworks.getValue()
         const contract = new ethers.Contract(ISUBNET_ADDRESS, ISubnetABI, wallet);
-        const newSubnetId = totalNetwork - 1;
+        const netuid = totalNetwork - 1;
 
         // servingRateLimit hyperparameter
         {
             const newValue = 100;
-            const tx = await contract.setServingRateLimit(newSubnetId, newValue);
+            const tx = await contract.setServingRateLimit(netuid, newValue);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.ServingRateLimit.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.ServingRateLimit.getValue(netuid)
 
 
             let valueFromContract = Number(
-                await contract.getServingRateLimit(newSubnetId)
+                await contract.getServingRateLimit(netuid)
             );
 
             assert.equal(valueFromContract, newValue)
@@ -127,16 +88,16 @@ describe("Test the EVM chain ID", () => {
         // disabled: only by sudo
         //
         // newValue = 101;
-        // tx = await contract.setMinDifficulty(newSubnetId, newValue);
+        // tx = await contract.setMinDifficulty(netuid, newValue);
         // await tx.wait();
 
         // await usingApi(async (api) => {
         //   onchainValue = Number(
-        //     await api.query.subtensorModule.minDifficulty(newSubnetId)
+        //     await api.query.subtensorModule.minDifficulty(netuid)
         //   );
         // });
 
-        // valueFromContract = Number(await contract.getMinDifficulty(newSubnetId));
+        // valueFromContract = Number(await contract.getMinDifficulty(netuid));
 
         // expect(valueFromContract).to.eq(newValue);
         // expect(valueFromContract).to.eq(onchainValue);
@@ -145,14 +106,14 @@ describe("Test the EVM chain ID", () => {
 
         {
             const newValue = 102;
-            const tx = await contract.setMaxDifficulty(newSubnetId, newValue);
+            const tx = await contract.setMaxDifficulty(netuid, newValue);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.MaxDifficulty.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.MaxDifficulty.getValue(netuid)
 
 
             let valueFromContract = Number(
-                await contract.getMaxDifficulty(newSubnetId)
+                await contract.getMaxDifficulty(netuid)
             );
 
             assert.equal(valueFromContract, newValue)
@@ -162,14 +123,14 @@ describe("Test the EVM chain ID", () => {
         // weightsVersionKey hyperparameter
         {
             const newValue = 103;
-            const tx = await contract.setWeightsVersionKey(newSubnetId, newValue);
+            const tx = await contract.setWeightsVersionKey(netuid, newValue);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.WeightsVersionKey.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.WeightsVersionKey.getValue(netuid)
 
 
             let valueFromContract = Number(
-                await contract.getWeightsVersionKey(newSubnetId)
+                await contract.getWeightsVersionKey(netuid)
             );
 
             assert.equal(valueFromContract, newValue)
@@ -178,14 +139,14 @@ describe("Test the EVM chain ID", () => {
         // weightsSetRateLimit hyperparameter
         {
             const newValue = 104;
-            const tx = await contract.setWeightsSetRateLimit(newSubnetId, newValue);
+            const tx = await contract.setWeightsSetRateLimit(netuid, newValue);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.WeightsSetRateLimit.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.WeightsSetRateLimit.getValue(netuid)
 
 
             let valueFromContract = Number(
-                await contract.getWeightsSetRateLimit(newSubnetId)
+                await contract.getWeightsSetRateLimit(netuid)
             );
 
             assert.equal(valueFromContract, newValue)
@@ -195,14 +156,14 @@ describe("Test the EVM chain ID", () => {
         // adjustmentAlpha hyperparameter
         {
             const newValue = 105;
-            const tx = await contract.setAdjustmentAlpha(newSubnetId, newValue);
+            const tx = await contract.setAdjustmentAlpha(netuid, newValue);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.AdjustmentAlpha.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.AdjustmentAlpha.getValue(netuid)
 
 
             let valueFromContract = Number(
-                await contract.getAdjustmentAlpha(newSubnetId)
+                await contract.getAdjustmentAlpha(netuid)
             );
 
             assert.equal(valueFromContract, newValue)
@@ -212,14 +173,14 @@ describe("Test the EVM chain ID", () => {
         // maxWeightLimit hyperparameter
         {
             const newValue = 106;
-            const tx = await contract.setMaxWeightLimit(newSubnetId, newValue);
+            const tx = await contract.setMaxWeightLimit(netuid, newValue);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.MaxWeightsLimit.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.MaxWeightsLimit.getValue(netuid)
 
 
             let valueFromContract = Number(
-                await contract.getMaxWeightLimit(newSubnetId)
+                await contract.getMaxWeightLimit(netuid)
             );
 
             assert.equal(valueFromContract, newValue)
@@ -228,14 +189,14 @@ describe("Test the EVM chain ID", () => {
         // immunityPeriod hyperparameter
         {
             const newValue = 107;
-            const tx = await contract.setImmunityPeriod(newSubnetId, newValue);
+            const tx = await contract.setImmunityPeriod(netuid, newValue);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.ImmunityPeriod.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.ImmunityPeriod.getValue(netuid)
 
 
             let valueFromContract = Number(
-                await contract.getImmunityPeriod(newSubnetId)
+                await contract.getImmunityPeriod(netuid)
             );
 
             assert.equal(valueFromContract, newValue)
@@ -245,14 +206,14 @@ describe("Test the EVM chain ID", () => {
         // minAllowedWeights hyperparameter
         {
             const newValue = 108;
-            const tx = await contract.setMinAllowedWeights(newSubnetId, newValue);
+            const tx = await contract.setMinAllowedWeights(netuid, newValue);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.MinAllowedWeights.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.MinAllowedWeights.getValue(netuid)
 
 
             let valueFromContract = Number(
-                await contract.getMinAllowedWeights(newSubnetId)
+                await contract.getMinAllowedWeights(netuid)
             );
 
             assert.equal(valueFromContract, newValue)
@@ -262,14 +223,14 @@ describe("Test the EVM chain ID", () => {
         // kappa hyperparameter
         {
             const newValue = 109;
-            const tx = await contract.setKappa(newSubnetId, newValue);
+            const tx = await contract.setKappa(netuid, newValue);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.Kappa.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.Kappa.getValue(netuid)
 
 
             let valueFromContract = Number(
-                await contract.getKappa(newSubnetId)
+                await contract.getKappa(netuid)
             );
 
             assert.equal(valueFromContract, newValue)
@@ -279,14 +240,14 @@ describe("Test the EVM chain ID", () => {
         // rho hyperparameter
         {
             const newValue = 110;
-            const tx = await contract.setRho(newSubnetId, newValue);
+            const tx = await contract.setRho(netuid, newValue);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.Rho.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.Rho.getValue(netuid)
 
 
             let valueFromContract = Number(
-                await contract.getRho(newSubnetId)
+                await contract.getRho(netuid)
             );
 
             assert.equal(valueFromContract, newValue)
@@ -296,14 +257,14 @@ describe("Test the EVM chain ID", () => {
         // activityCutoff hyperparameter
         {
             const newValue = 111;
-            const tx = await contract.setActivityCutoff(newSubnetId, newValue);
+            const tx = await contract.setActivityCutoff(netuid, newValue);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.ActivityCutoff.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.ActivityCutoff.getValue(netuid)
 
 
             let valueFromContract = Number(
-                await contract.getActivityCutoff(newSubnetId)
+                await contract.getActivityCutoff(netuid)
             );
 
             assert.equal(valueFromContract, newValue)
@@ -313,14 +274,14 @@ describe("Test the EVM chain ID", () => {
         // networkRegistrationAllowed hyperparameter
         {
             const newValue = true;
-            const tx = await contract.setNetworkRegistrationAllowed(newSubnetId, newValue);
+            const tx = await contract.setNetworkRegistrationAllowed(netuid, newValue);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.NetworkRegistrationAllowed.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.NetworkRegistrationAllowed.getValue(netuid)
 
 
             let valueFromContract = Boolean(
-                await contract.getNetworkRegistrationAllowed(newSubnetId)
+                await contract.getNetworkRegistrationAllowed(netuid)
             );
 
             assert.equal(valueFromContract, newValue)
@@ -330,14 +291,14 @@ describe("Test the EVM chain ID", () => {
         // networkPowRegistrationAllowed hyperparameter
         {
             const newValue = true;
-            const tx = await contract.setNetworkPowRegistrationAllowed(newSubnetId, newValue);
+            const tx = await contract.setNetworkPowRegistrationAllowed(netuid, newValue);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.NetworkPowRegistrationAllowed.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.NetworkPowRegistrationAllowed.getValue(netuid)
 
 
             let valueFromContract = Boolean(
-                await contract.getNetworkPowRegistrationAllowed(newSubnetId)
+                await contract.getNetworkPowRegistrationAllowed(netuid)
             );
 
             assert.equal(valueFromContract, newValue)
@@ -347,16 +308,16 @@ describe("Test the EVM chain ID", () => {
         // minBurn hyperparameter. only sudo can set it now
         // newValue = 112;
 
-        // tx = await contract.setMinBurn(newSubnetId, newValue);
+        // tx = await contract.setMinBurn(netuid, newValue);
         // await tx.wait();
 
         // await usingApi(async (api) => {
         //   onchainValue = Number(
-        //     await api.query.subtensorModule.minBurn(newSubnetId)
+        //     await api.query.subtensorModule.minBurn(netuid)
         //   );
         // });
 
-        // valueFromContract = Number(await contract.getMinBurn(newSubnetId));
+        // valueFromContract = Number(await contract.getMinBurn(netuid));
 
         // expect(valueFromContract).to.eq(newValue);
         // expect(valueFromContract).to.eq(onchainValue);
@@ -364,14 +325,14 @@ describe("Test the EVM chain ID", () => {
         // maxBurn hyperparameter
         {
             const newValue = 113;
-            const tx = await contract.setMaxBurn(newSubnetId, newValue);
+            const tx = await contract.setMaxBurn(netuid, newValue);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.MaxBurn.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.MaxBurn.getValue(netuid)
 
 
             let valueFromContract = Number(
-                await contract.getMaxBurn(newSubnetId)
+                await contract.getMaxBurn(netuid)
             );
 
             assert.equal(valueFromContract, newValue)
@@ -382,16 +343,16 @@ describe("Test the EVM chain ID", () => {
         // difficulty hyperparameter (disabled: sudo only)
         // newValue = 114;
 
-        // tx = await contract.setDifficulty(newSubnetId, newValue);
+        // tx = await contract.setDifficulty(netuid, newValue);
         // await tx.wait();
 
         // await usingApi(async (api) => {
         //   onchainValue = Number(
-        //     await api.query.subtensorModule.difficulty(newSubnetId)
+        //     await api.query.subtensorModule.difficulty(netuid)
         //   );
         // });
 
-        // valueFromContract = Number(await contract.getDifficulty(newSubnetId));
+        // valueFromContract = Number(await contract.getDifficulty(netuid));
 
         // expect(valueFromContract).to.eq(newValue);
         // expect(valueFromContract).to.eq(onchainValue);
@@ -399,14 +360,14 @@ describe("Test the EVM chain ID", () => {
         // bondsMovingAverage hyperparameter
         {
             const newValue = 115;
-            const tx = await contract.setBondsMovingAverage(newSubnetId, newValue);
+            const tx = await contract.setBondsMovingAverage(netuid, newValue);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.BondsMovingAverage.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.BondsMovingAverage.getValue(netuid)
 
 
             let valueFromContract = Number(
-                await contract.getBondsMovingAverage(newSubnetId)
+                await contract.getBondsMovingAverage(netuid)
             );
 
             assert.equal(valueFromContract, newValue)
@@ -417,14 +378,14 @@ describe("Test the EVM chain ID", () => {
         // commitRevealWeightsEnabled hyperparameter
         {
             const newValue = true;
-            const tx = await contract.setCommitRevealWeightsEnabled(newSubnetId, newValue);
+            const tx = await contract.setCommitRevealWeightsEnabled(netuid, newValue);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.CommitRevealWeightsEnabled.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.CommitRevealWeightsEnabled.getValue(netuid)
 
 
             let valueFromContract = Boolean(
-                await contract.getCommitRevealWeightsEnabled(newSubnetId)
+                await contract.getCommitRevealWeightsEnabled(netuid)
             );
 
             assert.equal(valueFromContract, newValue)
@@ -434,14 +395,14 @@ describe("Test the EVM chain ID", () => {
         // liquidAlphaEnabled hyperparameter
         {
             const newValue = true;
-            const tx = await contract.setLiquidAlphaEnabled(newSubnetId, newValue);
+            const tx = await contract.setLiquidAlphaEnabled(netuid, newValue);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.LiquidAlphaOn.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.LiquidAlphaOn.getValue(netuid)
 
 
             let valueFromContract = Boolean(
-                await contract.getLiquidAlphaEnabled(newSubnetId)
+                await contract.getLiquidAlphaEnabled(netuid)
             );
 
             assert.equal(valueFromContract, newValue)
@@ -451,12 +412,12 @@ describe("Test the EVM chain ID", () => {
         // alphaValues hyperparameter
         {
             const newValue = [118, 52429];
-            const tx = await contract.setAlphaValues(newSubnetId, newValue[0], newValue[1]);
+            const tx = await contract.setAlphaValues(netuid, newValue[0], newValue[1]);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.AlphaValues.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.AlphaValues.getValue(netuid)
 
-            let value = await contract.getAlphaValues(newSubnetId)
+            let value = await contract.getAlphaValues(netuid)
             let valueFromContract = [Number(value[0]), Number(value[1])]
 
             assert.equal(valueFromContract[0], newValue[0])
@@ -468,18 +429,17 @@ describe("Test the EVM chain ID", () => {
         // commitRevealWeightsInterval hyperparameter
         {
             const newValue = 119;
-            const tx = await contract.setCommitRevealWeightsInterval(newSubnetId, newValue);
+            const tx = await contract.setCommitRevealWeightsInterval(netuid, newValue);
             await tx.wait();
 
-            let onchainValue = await api.query.SubtensorModule.RevealPeriodEpochs.getValue(newSubnetId)
+            let onchainValue = await api.query.SubtensorModule.RevealPeriodEpochs.getValue(netuid)
 
             let valueFromContract = Number(
-                await contract.getCommitRevealWeightsInterval(newSubnetId)
+                await contract.getCommitRevealWeightsInterval(netuid)
             );
 
             assert.equal(valueFromContract, newValue)
             assert.equal(valueFromContract, onchainValue);
         }
-
     })
 });

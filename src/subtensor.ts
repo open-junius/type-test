@@ -124,6 +124,39 @@ export async function setCommitRevealWeightsInterval(api: TypedApi<typeof devnet
     assert.equal(interval, await api.query.SubtensorModule.RevealPeriodEpochs.getValue(netuid))
 }
 
+
+export async function forceSetChainID(api: TypedApi<typeof devnet>, chainId: bigint) {
+    const value = await api.query.EVMChainId.ChainId.getValue()
+    if (value === chainId) {
+        return;
+    }
+
+    const alice = getAliceSigner()
+    const internalCall = api.tx.AdminUtils.sudo_set_evm_chain_id({ chain_id: chainId })
+    const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
+
+    await waitForTransactionCompletion(api, tx, alice)
+        .then(() => { })
+        .catch((error) => { console.log(`transaction error ${error}`) });
+    assert.equal(chainId, await api.query.EVMChainId.ChainId.getValue())
+}
+
+export async function disableWhiteListCheck(api: TypedApi<typeof devnet>, disabled: boolean) {
+    const value = await api.query.EVM.DisableWhitelistCheck.getValue()
+    if (value === disabled) {
+        return;
+    }
+
+    const alice = getAliceSigner()
+    const internalCall = api.tx.EVM.disable_whitelist({ disabled: disabled })
+    const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
+
+    await waitForTransactionCompletion(api, tx, alice)
+        .then(() => { })
+        .catch((error) => { console.log(`transaction error ${error}`) });
+    assert.equal(disabled, await api.query.EVM.DisableWhitelistCheck.getValue())
+}
+
 export async function burnedRegister(api: TypedApi<typeof devnet>, netuid: number, ss58Address: string, keypair: KeyPair) {
     const uids = await api.query.SubtensorModule.SubnetworkN.getValue(netuid)
     const signer = getSignerFromKeypair(keypair)

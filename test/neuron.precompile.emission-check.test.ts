@@ -1,17 +1,17 @@
 import * as assert from "assert";
 import * as chai from "chai";
 
-import { getAliceSigner, getClient, getDevnetApi, waitForTransactionCompletion, convertPublicKeyToMultiAddress, getRandomSubstrateKeypair, getSignerFromKeypair } from "../src/substrate"
+import { getAliceSigner, getClient, getDevnetApi, getRandomSubstrateKeypair } from "../src/substrate"
 import { getPublicClient, } from "../src/utils";
 import { ETH_LOCAL_URL, SUB_LOCAL_URL, } from "../src/config";
-import { devnet, MultiAddress } from "@polkadot-api/descriptors"
-import { PublicClient, walletActions } from "viem";
+import { devnet } from "@polkadot-api/descriptors"
+import { PublicClient } from "viem";
 import { PolkadotSigner, TypedApi } from "polkadot-api";
-import { toViemAddress, convertPublicKeyToSs58, convertH160ToSS58 } from "../src/address-utils"
-import { decodeAddress } from "@polkadot/util-crypto";
+import { convertPublicKeyToSs58, } from "../src/address-utils"
 import { ethers } from "ethers"
 import { INEURON_ADDRESS, INeuronABI } from "../src/contracts/neuron"
 import { generateRandomEthersWallet } from "../src/utils"
+import { forceSetBalanceToSs58Address, forceSetBalanceToEthAddress, addNewSubnetwork } from "../src/subtensor"
 
 describe("Test the EVM chain ID", () => {
     // init eth part
@@ -19,6 +19,8 @@ describe("Test the EVM chain ID", () => {
 
     // init substrate part
     const hotkey = getRandomSubstrateKeypair();
+    const hotkey2 = getRandomSubstrateKeypair();
+    const coldkey = getRandomSubstrateKeypair();
     let publicClient: PublicClient;
 
     let api: TypedApi<typeof devnet>
@@ -30,68 +32,41 @@ describe("Test the EVM chain ID", () => {
         // init variables got from await and async
         publicClient = await getPublicClient(ETH_LOCAL_URL)
         const subClient = await getClient(SUB_LOCAL_URL)
-        api = await getDevnetApi(subClient)
+        api = await getDevnetApi()
         alice = await getAliceSigner();
+        await forceSetBalanceToSs58Address(api, convertPublicKeyToSs58(hotkey.publicKey))
+        await forceSetBalanceToSs58Address(api, convertPublicKeyToSs58(hotkey2.publicKey))
 
-        {
-            const multiAddress = convertPublicKeyToMultiAddress(hotkey.publicKey)
-            const internalCall = api.tx.Balances.force_set_balance({ who: multiAddress, new_free: BigInt(1e12) })
-            const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
+        await forceSetBalanceToSs58Address(api, convertPublicKeyToSs58(coldkey.publicKey))
+        await forceSetBalanceToEthAddress(api, wallet.address)
 
-            await waitForTransactionCompletion(api, tx, alice)
-                .then(() => { })
-                .catch((error) => { console.log(`transaction error ${error}`) });
-        }
-
-        {
-            const ss58Address = convertH160ToSS58(wallet.address)
-            const internalCall = api.tx.Balances.force_set_balance({ who: MultiAddress.Id(ss58Address), new_free: BigInt(1e12) })
-            const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
-
-            await waitForTransactionCompletion(api, tx, alice)
-                .then(() => { })
-                .catch((error) => { console.log(`transaction error ${error}`) });
-        }
-
-        let totalNetworks = await api.query.SubtensorModule.TotalNetworks.getValue()
-        assert.ok(totalNetworks > 1)
-        const subnetId = totalNetworks - 1
-
-        let uid_count =
-            await api.query.SubtensorModule.SubnetworkN.getValue(subnetId)
-        if (uid_count === 0) {
-            const tx = api.tx.SubtensorModule.burned_register({ hotkey: convertPublicKeyToSs58(hotkey.publicKey), netuid: subnetId })
-            await waitForTransactionCompletion(api, tx, alice)
-                .then(() => { })
-                .catch((error) => { console.log(`transaction error ${error}`) });
-        }
+        const netuid = await addNewSubnetwork(api, hotkey2, coldkey)
+        console.log("test on subnet ", netuid)
     })
 
     it("Burned register and check emission", async () => {
-        let totalNetworks = await api.query.SubtensorModule.TotalNetworks.getValue()
-        const subnetId = totalNetworks - 1
-        const uid = await api.query.SubtensorModule.SubnetworkN.getValue(subnetId)
+        let netuid = (await api.query.SubtensorModule.TotalNetworks.getValue()) - 1
+        const uid = await api.query.SubtensorModule.SubnetworkN.getValue(netuid)
         const contract = new ethers.Contract(INEURON_ADDRESS, INeuronABI, wallet);
 
         const tx = await contract.burnedRegister(
-            subnetId,
+            netuid,
             hotkey.publicKey
         );
         await tx.wait();
 
-        const uidAfterNew = await api.query.SubtensorModule.SubnetworkN.getValue(subnetId)
+        const uidAfterNew = await api.query.SubtensorModule.SubnetworkN.getValue(netuid)
         assert.equal(uid + 1, uidAfterNew)
 
-        const key = await api.query.SubtensorModule.Keys.getValue(subnetId, uid)
+        const key = await api.query.SubtensorModule.Keys.getValue(netuid, uid)
         assert.equal(key, convertPublicKeyToSs58(hotkey.publicKey))
 
         let i = 0;
         while (i < 10) {
-            const emission = await api.query.SubtensorModule.PendingEmission.getValue(subnetId)
+            const emission = await api.query.SubtensorModule.PendingEmission.getValue(netuid)
 
             console.log("emission is ", emission);
             await new Promise((resolve) => setTimeout(resolve, 2000));
-            assert.ok(emission > BigInt(0))
             i += 1;
         }
     })

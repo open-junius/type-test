@@ -16,10 +16,11 @@ import { getPolkadotSigner } from "polkadot-api/signer"
 import { randomBytes } from 'crypto';
 import { Keyring } from '@polkadot/keyring';
 
+let api: TypedApi<typeof devnet> | undefined = undefined
+
 // define url string as type to extend in the future
 // export type ClientUrlType = 'ws://localhost:9944' | 'wss://test.finney.opentensor.ai:443' | 'wss://dev.chain.opentensor.ai:443' | 'wss://archive.chain.opentensor.ai';
 export type ClientUrlType = 'ws://localhost:9944'
-
 
 export async function getClient(url: ClientUrlType) {
     const provider = getWsProvider(url);
@@ -27,8 +28,11 @@ export async function getClient(url: ClientUrlType) {
     return client
 }
 
-export async function getDevnetApi(client: PolkadotClient) {
-    let api = client.getTypedApi(devnet)
+export async function getDevnetApi() {
+    if (api === undefined) {
+        let client = await getClient('ws://localhost:9944')
+        api = client.getTypedApi(devnet)
+    }
     return api
 }
 
@@ -50,30 +54,6 @@ export function getAliceSigner() {
     )
 
     return polkadotSigner
-}
-
-// create a new subnet and return netuid 
-export async function addNewSubnetwork(api: TypedApi<typeof devnet>, hotkey: KeyPair, coldkey: KeyPair) {
-    const alice = getAliceSigner()
-    const totalNetworks = await api.query.SubtensorModule.TotalNetworks.getValue()
-
-    const rateLimit = await api.query.SubtensorModule.NetworkRateLimit.getValue()
-    if (rateLimit !== BigInt(0)) {
-        const internalCall = api.tx.AdminUtils.sudo_set_network_rate_limit({ rate_limit: BigInt(0) })
-        const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
-        await waitForTransactionCompletion(api, tx, alice)
-            .then(() => { })
-            .catch((error) => { console.log(`transaction error ${error}`) });
-    }
-
-    const signer = getSignerFromKeypair(coldkey)
-    const registerNetworkTx = api.tx.SubtensorModule.register_network({ hotkey: convertPublicKeyToSs58(hotkey.publicKey) })
-    await waitForTransactionCompletion(api, registerNetworkTx, signer)
-        .then(() => { })
-        .catch((error) => { console.log(`transaction error ${error}`) });
-
-    assert.equal(totalNetworks + 1, await api.query.SubtensorModule.TotalNetworks.getValue())
-    return totalNetworks
 }
 
 export function getRandomSubstrateSigner() {

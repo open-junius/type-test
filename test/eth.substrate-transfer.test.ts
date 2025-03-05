@@ -1,7 +1,7 @@
 import * as assert from "assert";
 import * as chai from "chai";
 
-import { getAliceSigner, getClient, getDevnetApi, waitForTransactionCompletion, convertPublicKeyToMultiAddress, getRandomSubstrateSigner, } from "../src/substrate"
+import { getDevnetApi, waitForTransactionCompletion, getRandomSubstrateSigner, } from "../src/substrate"
 import { getPublicClient, getTestClient, getWalletClient, } from "../src/utils";
 import { ETH_LOCAL_URL, SUB_LOCAL_URL, IBALANCETRANSFER_ADDRESS, IBalanceTransferABI } from "../src/config";
 import { devnet, MultiAddress } from "@polkadot-api/descriptors"
@@ -15,6 +15,8 @@ import { estimateTransactionCost, getContract } from "../src/eth"
 
 import { WITHDRAW_CONTRACT_ABI, WITHDRAW_CONTRACT_BYTECODE } from "../src/contracts/withdraw"
 
+import { forceSetBalanceToEthAddress, forceSetBalanceToSs58Address, disableWhiteListCheck } from "../src/subtensor";
+
 describe("Balance transfers between substrate and EVM", () => {
     const gwei = BigInt("1000000000");
     // init eth part
@@ -26,41 +28,15 @@ describe("Balance transfers between substrate and EVM", () => {
     const signer = getRandomSubstrateSigner();
     let api: TypedApi<typeof devnet>
 
-    // sudo account alice as signer
-    let alice: PolkadotSigner;
-
     before(async () => {
 
         publicClient = await getPublicClient(ETH_LOCAL_URL)
-        const subClient = await getClient(SUB_LOCAL_URL)
-        api = await getDevnetApi(subClient)
-        alice = await getAliceSigner();
+        api = await getDevnetApi()
 
-        // Alice funds fundedEthWallet
-        const ss58Address = convertH160ToSS58(wallet.address)
-        const internalCall = api.tx.Balances.force_set_balance({ who: MultiAddress.Id(ss58Address), new_free: tao(123) })
-        const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
-
-        await waitForTransactionCompletion(api, tx, alice)
-            .then(() => { })
-            .catch((error) => { console.log(`transaction error ${error}`) });
-
-        const ss58Address2 = convertH160ToSS58(wallet2.address)
-        const internalCall2 = api.tx.Balances.force_set_balance({ who: MultiAddress.Id(ss58Address2), new_free: tao(123) })
-        const tx2 = api.tx.Sudo.sudo({ call: internalCall2.decodedCall })
-
-        await waitForTransactionCompletion(api, tx2, alice)
-            .then(() => { })
-            .catch((error) => { console.log(`transaction error ${error}`) });
-
-        const multiAddress = convertPublicKeyToMultiAddress(signer.publicKey)
-        const internalCall3 = api.tx.Balances.force_set_balance({ who: multiAddress, new_free: tao(123) })
-        const tx3 = api.tx.Sudo.sudo({ call: internalCall3.decodedCall })
-
-        await waitForTransactionCompletion(api, tx3, alice)
-            .then(() => { })
-            .catch((error) => { console.log(`transaction error ${error}`) });
-
+        await forceSetBalanceToEthAddress(api, wallet.address)
+        await forceSetBalanceToEthAddress(api, wallet2.address)
+        await forceSetBalanceToSs58Address(api, convertPublicKeyToSs58(signer.publicKey))
+        await disableWhiteListCheck(api, true)
     });
 
     it("Can transfer token from EVM to EVM", async () => {
@@ -190,11 +166,7 @@ describe("Balance transfers between substrate and EVM", () => {
     });
 
     it("Forward value in smart contract", async () => {
-        const internalTx = api.tx.EVM.disable_whitelist({ disabled: true })
-        const tx = api.tx.Sudo.sudo({ call: internalTx.decodedCall })
-        await waitForTransactionCompletion(api, tx, alice)
-            .then(() => { })
-            .catch((error) => { console.log(`transaction error ${error}`) });
+
 
         const contractFactory = new ethers.ContractFactory(WITHDRAW_CONTRACT_ABI, WITHDRAW_CONTRACT_BYTECODE, wallet)
         const contract = await contractFactory.deploy()

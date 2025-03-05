@@ -32,7 +32,7 @@ describe("Test the EVM chain ID", () => {
         // init variables got from await and async
         publicClient = await getPublicClient(ETH_LOCAL_URL)
         const subClient = await getClient(SUB_LOCAL_URL)
-        api = await getDevnetApi(subClient)
+        api = await getDevnetApi()
         alice = await getAliceSigner();
 
         {

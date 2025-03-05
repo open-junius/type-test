@@ -1,12 +1,8 @@
 import * as assert from "assert";
-import * as chai from "chai";
-
 import { getAliceSigner, getClient, getDevnetApi, getRandomSubstrateKeypair } from "../src/substrate"
-import { getPublicClient, } from "../src/utils";
-import { ETH_LOCAL_URL, SUB_LOCAL_URL, } from "../src/config";
-import { devnet, MultiAddress } from "@polkadot-api/descriptors"
-import { PublicClient, walletActions } from "viem";
-import { PolkadotSigner, TypedApi } from "polkadot-api";
+import { SUB_LOCAL_URL, } from "../src/config";
+import { devnet } from "@polkadot-api/descriptors"
+import { PolkadotClient, PolkadotSigner, TypedApi } from "polkadot-api";
 import { convertPublicKeyToSs58, convertH160ToSS58 } from "../src/address-utils"
 import { Vec, Tuple, VecFixed, u16, u8, u64 } from "@polkadot/types-codec";
 import { TypeRegistry } from "@polkadot/types";
@@ -54,7 +50,6 @@ describe("Test neuron precompile reveal weights", () => {
     // init substrate part
     const hotkey = getRandomSubstrateKeypair();
     const coldkey = getRandomSubstrateKeypair();
-    let publicClient: PublicClient;
 
     let api: TypedApi<typeof devnet>
 
@@ -62,9 +57,7 @@ describe("Test neuron precompile reveal weights", () => {
     let alice: PolkadotSigner;
     before(async () => {
         // init variables got from await and async
-        publicClient = await getPublicClient(ETH_LOCAL_URL)
-        const subClient = await getClient(SUB_LOCAL_URL)
-        api = await getDevnetApi(subClient)
+        api = await getDevnetApi()
         alice = await getAliceSigner();
 
         await forceSetBalanceToSs58Address(api, convertPublicKeyToSs58(alice.publicKey))
@@ -89,7 +82,6 @@ describe("Test neuron precompile reveal weights", () => {
         )
         // eth wallet account should be the first neuron in the subnet
         assert.equal(uid, uids[0])
-
     })
 
     it("EVM neuron commit weights via call precompile", async () => {
@@ -147,6 +139,5 @@ describe("Test neuron precompile reveal weights", () => {
             assert.equal(weight[0], neuron_uid)
             assert.ok(weight[1] !== undefined)
         }
-
     })
 });
