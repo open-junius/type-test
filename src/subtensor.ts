@@ -1,6 +1,6 @@
 import * as assert from "assert";
 import { devnet, MultiAddress } from '@polkadot-api/descriptors';
-import { createClient, PolkadotClient, TypedApi, Transaction, PolkadotSigner, Binary } from 'polkadot-api';
+import { createClient, PolkadotClient, TypedApi, Transaction, PolkadotSigner, Binary, TxCallData } from 'polkadot-api';
 import {
     KeyPair,
     ss58Address,
@@ -9,6 +9,7 @@ import {
 import { getAliceSigner, waitForTransactionCompletion, getSignerFromKeypair } from './substrate'
 import { convertH160ToSS58, convertPublicKeyToSs58 } from './address-utils'
 import { tao } from './balance-math'
+import { decodeBytes32String, N } from "ethers";
 
 // create a new subnet and return netuid 
 export async function addNewSubnetwork(api: TypedApi<typeof devnet>, hotkey: KeyPair, coldkey: KeyPair) {
@@ -165,4 +166,186 @@ export async function burnedRegister(api: TypedApi<typeof devnet>, netuid: numbe
         .then(() => { })
         .catch((error) => { console.log(`transaction error ${error}`) });
     assert.equal(uids + 1, await api.query.SubtensorModule.SubnetworkN.getValue(netuid))
+}
+
+
+export async function sendProxyCall(api: TypedApi<typeof devnet>, calldata: TxCallData, ss58Address: string, keypair: KeyPair) {
+    const signer = getSignerFromKeypair(keypair)
+    const tx = api.tx.Proxy.proxy({
+        call: calldata,
+        real: MultiAddress.Id(ss58Address),
+        force_proxy_type: undefined
+    });
+    await waitForTransactionCompletion(api, tx, signer)
+        .then(() => { })
+        .catch((error) => { console.log(`transaction error ${error}`) });
+}
+
+
+export async function setTxRateLimit(api: TypedApi<typeof devnet>, txRateLimit: bigint) {
+    const value = await api.query.SubtensorModule.TxRateLimit.getValue()
+    if (value === txRateLimit) {
+        return;
+    }
+    const alice = getAliceSigner()
+
+    const internalCall = api.tx.AdminUtils.sudo_set_tx_rate_limit({ tx_rate_limit: txRateLimit })
+    const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
+
+
+    await waitForTransactionCompletion(api, tx, alice)
+        .then(() => { })
+        .catch((error) => { console.log(`transaction error ${error}`) });
+    assert.equal(txRateLimit, await api.query.SubtensorModule.TxRateLimit.getValue())
+}
+
+export async function setMaxAllowedValidators(api: TypedApi<typeof devnet>, netuid: number, maxAllowedValidators: number) {
+    const value = await api.query.SubtensorModule.MaxAllowedValidators.getValue(netuid)
+    if (value === maxAllowedValidators) {
+        return;
+    }
+
+    const alice = getAliceSigner()
+
+    const internalCall = api.tx.AdminUtils.sudo_set_max_allowed_validators({
+        netuid: netuid,
+        max_allowed_validators: maxAllowedValidators
+    })
+    const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
+
+    await waitForTransactionCompletion(api, tx, alice)
+        .then(() => { })
+        .catch((error) => { console.log(`transaction error ${error}`) });
+    assert.equal(maxAllowedValidators, await api.query.SubtensorModule.MaxAllowedValidators.getValue(netuid))
+}
+
+export async function setSubnetOwnerCut(api: TypedApi<typeof devnet>, subnetOwnerCut: number) {
+    const value = await api.query.SubtensorModule.SubnetOwnerCut.getValue()
+    if (value === subnetOwnerCut) {
+        return;
+    }
+
+    const alice = getAliceSigner()
+
+    const internalCall = api.tx.AdminUtils.sudo_set_subnet_owner_cut({
+        subnet_owner_cut: subnetOwnerCut
+    })
+    const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
+
+    await waitForTransactionCompletion(api, tx, alice)
+        .then(() => { })
+        .catch((error) => { console.log(`transaction error ${error}`) });
+    assert.equal(subnetOwnerCut, await api.query.SubtensorModule.SubnetOwnerCut.getValue())
+}
+
+export async function setActivityCutoff(api: TypedApi<typeof devnet>, netuid: number, activityCutoff: number) {
+    const value = await api.query.SubtensorModule.ActivityCutoff.getValue(netuid)
+    if (value === activityCutoff) {
+        return;
+    }
+
+    const alice = getAliceSigner()
+
+    const internalCall = api.tx.AdminUtils.sudo_set_activity_cutoff({
+        netuid: netuid,
+        activity_cutoff: activityCutoff
+    })
+    const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
+
+    await waitForTransactionCompletion(api, tx, alice)
+        .then(() => { })
+        .catch((error) => { console.log(`transaction error ${error}`) });
+    assert.equal(activityCutoff, await api.query.SubtensorModule.ActivityCutoff.getValue(netuid))
+}
+
+export async function setMaxAllowedUids(api: TypedApi<typeof devnet>, netuid: number, maxAllowedUids: number) {
+    const value = await api.query.SubtensorModule.MaxAllowedUids.getValue(netuid)
+    if (value === maxAllowedUids) {
+        return;
+    }
+
+    const alice = getAliceSigner()
+
+    const internalCall = api.tx.AdminUtils.sudo_set_max_allowed_uids({
+        netuid: netuid,
+        max_allowed_uids: maxAllowedUids
+    })
+    const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
+
+    await waitForTransactionCompletion(api, tx, alice)
+        .then(() => { })
+        .catch((error) => { console.log(`transaction error ${error}`) });
+    assert.equal(maxAllowedUids, await api.query.SubtensorModule.MaxAllowedUids.getValue(netuid))
+}
+
+export async function setMinDelegateTake(api: TypedApi<typeof devnet>, minDelegateTake: number) {
+    const value = await api.query.SubtensorModule.MinDelegateTake.getValue()
+    if (value === minDelegateTake) {
+        return;
+    }
+
+    const alice = getAliceSigner()
+
+    const internalCall = api.tx.AdminUtils.sudo_set_min_delegate_take({
+        take: minDelegateTake
+    })
+    const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
+
+    await waitForTransactionCompletion(api, tx, alice)
+        .then(() => { })
+        .catch((error) => { console.log(`transaction error ${error}`) });
+    assert.equal(minDelegateTake, await api.query.SubtensorModule.MinDelegateTake.getValue())
+}
+
+export async function becomeDelegate(api: TypedApi<typeof devnet>, ss58Address: string, keypair: KeyPair) {
+    const singer = getSignerFromKeypair(keypair)
+
+    const tx = api.tx.SubtensorModule.become_delegate({
+        hotkey: ss58Address
+    })
+    await waitForTransactionCompletion(api, tx, singer)
+        .then(() => { })
+        .catch((error) => { console.log(`transaction error ${error}`) });
+}
+
+export async function addStake(api: TypedApi<typeof devnet>, netuid: number, ss58Address: string, amount_staked: bigint, keypair: KeyPair) {
+    const singer = getSignerFromKeypair(keypair)
+    let tx = api.tx.SubtensorModule.add_stake({
+        netuid: netuid,
+        hotkey: ss58Address,
+        amount_staked: amount_staked
+    })
+
+    await waitForTransactionCompletion(api, tx, singer)
+        .then(() => { })
+        .catch((error) => { console.log(`transaction error ${error}`) });
+
+}
+
+export async function setWeight(api: TypedApi<typeof devnet>, netuid: number, dests: number[], weights: number[], version_key: bigint, keypair: KeyPair) {
+    const singer = getSignerFromKeypair(keypair)
+    let tx = api.tx.SubtensorModule.set_weights({
+        netuid: netuid,
+        dests: dests,
+        weights: weights,
+        version_key: version_key
+    })
+
+    await waitForTransactionCompletion(api, tx, singer)
+        .then(() => { })
+        .catch((error) => { console.log(`transaction error ${error}`) });
+
+}
+
+
+export async function rootRegister(api: TypedApi<typeof devnet>, ss58Address: string, keypair: KeyPair) {
+    const singer = getSignerFromKeypair(keypair)
+    let tx = api.tx.SubtensorModule.root_register({
+        hotkey: ss58Address
+    })
+
+    await waitForTransactionCompletion(api, tx, singer)
+        .then(() => { })
+        .catch((error) => { console.log(`transaction error ${error}`) });
+
 }
