@@ -3,6 +3,7 @@ import { devnet, MultiAddress } from '@polkadot-api/descriptors';
 import { createClient, PolkadotClient, TypedApi, Transaction, PolkadotSigner, Binary } from 'polkadot-api';
 import { getWsProvider } from 'polkadot-api/ws-provider/web';
 import { sr25519CreateDerive } from "@polkadot-labs/hdkd"
+import { convertPublicKeyToSs58 } from "../src/address-utils"
 import {
     sr25519,
     DEV_PHRASE,
@@ -122,16 +123,6 @@ export async function getNonceChangePromise(api: TypedApi<typeof devnet>, ss58Ad
     })
 }
 
-export function convertPublicKeyToSs58(publicKey: Uint8Array, ss58Format: number = 42): string {
-    // Create a keyring instance
-    const keyring = new Keyring({ type: 'sr25519', ss58Format });
-
-    // Add the public key to the keyring
-    const address = keyring.encodeAddress(publicKey);
-
-    return address
-}
-
 export function convertPublicKeyToMultiAddress(publicKey: Uint8Array, ss58Format: number = 42): MultiAddress {
     // Create a keyring instance
     const keyring = new Keyring({ type: 'sr25519', ss58Format });
@@ -141,6 +132,7 @@ export function convertPublicKeyToMultiAddress(publicKey: Uint8Array, ss58Format
 
     return MultiAddress.Id(address);
 }
+
 
 export async function waitForTransactionCompletion(api: TypedApi<typeof devnet>, tx: Transaction<{}, string, string, void>, signer: PolkadotSigner,) {
     const transactionPromise = await getTransactionWatchPromise(tx, signer)
@@ -268,3 +260,15 @@ export async function waitForNonceChange(api: TypedApi<typeof devnet>, ss58Addre
         await new Promise(resolve => setTimeout(resolve, 200));
     }
 }
+
+
+// other approach to convert public key to ss58
+// export function convertPublicKeyToSs58(publicKey: Uint8Array, ss58Format: number = 42): string {
+//     // Create a keyring instance
+//     const keyring = new Keyring({ type: 'sr25519', ss58Format });
+
+//     // Add the public key to the keyring
+//     const address = keyring.encodeAddress(publicKey);
+
+//     return address
+// }

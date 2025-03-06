@@ -1,8 +1,5 @@
-import { publicKeyToAddress } from "viem/accounts";
-import { getWalletClient, generateRandomEthWallet } from "./utils";
-import { verifyMessage } from "viem/_types/actions/public/verifyMessage";
+
 import { ethers, Provider, TransactionRequest, Wallet } from "ethers";
-import { convertH160ToSS58 } from "./address-utils"
 export async function estimateTransactionCost(provider: Provider, tx: TransactionRequest) {
     const feeData = await provider.getFeeData();
     const estimatedGas = BigInt(await provider.estimateGas(tx));

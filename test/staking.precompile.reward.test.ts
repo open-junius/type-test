@@ -1,8 +1,8 @@
 import * as assert from "assert";
 import { getDevnetApi, getRandomSubstrateKeypair } from "../src/substrate"
 import { devnet } from "@polkadot-api/descriptors"
-import { PolkadotSigner, TypedApi } from "polkadot-api";
-import { convertPublicKeyToSs58, convertH160ToSS58 } from "../src/address-utils"
+import { TypedApi } from "polkadot-api";
+import { convertPublicKeyToSs58 } from "../src/address-utils"
 import { tao } from "../src/balance-math"
 import {
     forceSetBalanceToSs58Address, addNewSubnetwork, burnedRegister,
@@ -20,8 +20,6 @@ describe("Test neuron precompile reveal weights", () => {
 
     let api: TypedApi<typeof devnet>
 
-    // sudo account alice as signer
-    let alice: PolkadotSigner;
     before(async () => {
         const root_netuid = 0;
         const root_tempo = 1; // neet root epoch to happen before subnet tempo
