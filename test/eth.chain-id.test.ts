@@ -2,38 +2,33 @@
 import * as assert from "assert";
 import * as chai from "chai";
 
-import { getAliceSigner, getDevnetApi, waitForTransactionCompletion, getRandomSubstrateKeypair, convertPublicKeyToSs58 } from "../src/substrate"
-import { generateRandomEthWallet, getWalletClient } from "../src/utils";
+import { getDevnetApi, waitForTransactionCompletion, getRandomSubstrateKeypair } from "../src/substrate"
+import { generateRandomEthWallet, getPublicClient } from "../src/utils";
+import { convertPublicKeyToSs58 } from "../src/address-utils"
 import { ETH_LOCAL_URL } from "../src/config";
 import { devnet } from "@polkadot-api/descriptors"
 import { getPolkadotSigner } from "polkadot-api/signer";
-import { WalletClient } from "viem";
-import { PolkadotSigner, TypedApi } from "polkadot-api";
+import { PublicClient } from "viem";
+import { TypedApi } from "polkadot-api";
 import { forceSetBalanceToSs58Address, forceSetChainID } from "../src/subtensor";
 
 describe("Test the EVM chain ID", () => {
   // init eth part
   const wallet = generateRandomEthWallet();
-  let ethClient: WalletClient;
+  let ethClient: PublicClient;
 
   // init substrate part
   const keyPair = getRandomSubstrateKeypair();
-  let api: TypedApi<typeof devnet>
-
-  // sudo account alice as signer
-  let alice: PolkadotSigner;
+  let api: TypedApi<typeof devnet>;
 
   // init other variable
   const initChainId = 42;
 
   before(async () => {
     // init variables got from await and async
-    ethClient = await getWalletClient(ETH_LOCAL_URL, wallet);
+    ethClient = await getPublicClient(ETH_LOCAL_URL);
     api = await getDevnetApi()
-    alice = await getAliceSigner();
-
     await forceSetBalanceToSs58Address(api, convertPublicKeyToSs58(keyPair.publicKey))
-
 
   });
 
