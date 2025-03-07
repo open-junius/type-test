@@ -1,15 +1,10 @@
 import * as assert from "assert";
 import { devnet, MultiAddress } from '@polkadot-api/descriptors';
-import { createClient, PolkadotClient, TypedApi, Transaction, PolkadotSigner, Binary, TxCallData } from 'polkadot-api';
-import {
-    KeyPair,
-    ss58Address,
-} from "@polkadot-labs/hdkd-helpers"
-
+import { TypedApi, TxCallData } from 'polkadot-api';
+import { KeyPair } from "@polkadot-labs/hdkd-helpers"
 import { getAliceSigner, waitForTransactionCompletion, getSignerFromKeypair } from './substrate'
 import { convertH160ToSS58, convertPublicKeyToSs58 } from './address-utils'
 import { tao } from './balance-math'
-import { decodeBytes32String, N } from "ethers";
 
 // create a new subnet and return netuid 
 export async function addNewSubnetwork(api: TypedApi<typeof devnet>, hotkey: KeyPair, coldkey: KeyPair) {
@@ -38,7 +33,7 @@ export async function addNewSubnetwork(api: TypedApi<typeof devnet>, hotkey: Key
 // force set balance for a ss58 address
 export async function forceSetBalanceToSs58Address(api: TypedApi<typeof devnet>, ss58Address: string) {
     const alice = getAliceSigner()
-    const balance = tao(1e6)
+    const balance = tao(1e8)
     const internalCall = api.tx.Balances.force_set_balance({ who: MultiAddress.Id(ss58Address), new_free: balance })
     const tx = api.tx.Sudo.sudo({ call: internalCall.decodedCall })
 
@@ -336,7 +331,6 @@ export async function setWeight(api: TypedApi<typeof devnet>, netuid: number, de
         .catch((error) => { console.log(`transaction error ${error}`) });
 
 }
-
 
 export async function rootRegister(api: TypedApi<typeof devnet>, ss58Address: string, keypair: KeyPair) {
     const singer = getSignerFromKeypair(keypair)

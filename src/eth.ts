@@ -15,4 +15,3 @@ export function getContract(contractAddress: string, abi: {}[], wallet: Wallet) 
     return contract
 
 }
-

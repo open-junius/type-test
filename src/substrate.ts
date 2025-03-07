@@ -1,18 +1,10 @@
 import * as assert from "assert";
 import { devnet, MultiAddress } from '@polkadot-api/descriptors';
-import { createClient, PolkadotClient, TypedApi, Transaction, PolkadotSigner, Binary } from 'polkadot-api';
+import { createClient, TypedApi, Transaction, PolkadotSigner, Binary } from 'polkadot-api';
 import { getWsProvider } from 'polkadot-api/ws-provider/web';
 import { sr25519CreateDerive } from "@polkadot-labs/hdkd"
 import { convertPublicKeyToSs58 } from "../src/address-utils"
-import {
-    sr25519,
-    DEV_PHRASE,
-    entropyToMiniSecret,
-    mnemonicToEntropy,
-    ss58Address,
-    KeyPair,
-} from "@polkadot-labs/hdkd-helpers"
-
+import { DEV_PHRASE, entropyToMiniSecret, mnemonicToEntropy, KeyPair } from "@polkadot-labs/hdkd-helpers"
 import { getPolkadotSigner } from "polkadot-api/signer"
 import { randomBytes } from 'crypto';
 import { Keyring } from '@polkadot/keyring';
