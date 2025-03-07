@@ -10,12 +10,14 @@ npm install polkadot-api
 
 npx papi add devnet -w ws://10.0.0.11:9944
 
-npx papi add devnet -w wss://dev.chain.opentensor.ai:443
+## get the new metadata
 
-npx papi add testnet -w wss://test.finney.opentensor.ai:443
+sh get-metadta.sh
 
-npx papi add mainnet -w wss://archive.chain.opentensor.ai
+## run all tests
 
-##
+yarn test
+
+## update dependence for coding
 
 npm update @polkadot-api/descriptors
